@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MaterialUploader } from "@/components/MaterialUploader";
 import { GeneratePlanButton } from "@/components/GeneratePlanButton";
+import { DeleteClassButton } from "@/components/DeleteClassButton";
 
 export default async function ClassDetailPage({
   params,
@@ -103,6 +104,10 @@ export default async function ClassDetailPage({
           )}
         </div>
       </section>
+
+      <div className="mt-6 flex justify-end">
+        <DeleteClassButton classId={klass.id} />
+      </div>
     </main>
   );
 }

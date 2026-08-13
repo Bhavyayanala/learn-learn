@@ -1,4 +1,4 @@
-# LearnNest — Stage 1: Foundation (Auth + Core Schema)
+# LearnNest — Stage 2: Materials + Automatic Lesson Planner
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,
@@ -16,10 +16,41 @@ working scaffold with authentication and a real database, not a mockup.
   `/student/dashboard`, `/parent/dashboard`
 - Middleware that redirects unauthenticated or wrong-role users to `/login`
 
-**Not yet built** (later stages): lesson planning engine, material upload,
-live classroom, whiteboard, games, assignments, tests, fee/payment
-management, notifications. See the project's master prompt for the full
-roadmap and build order.
+## What's included in Stage 2
+
+- **Class creation** — teacher picks subject, grade, classes/month,
+  duration, fee, start date, days of week
+- **Material upload** — PDFs/notes/worksheets go to a private Supabase
+  Storage bucket (`materials`), scoped per class via storage RLS policies
+- **Syllabus catalog** (`topics` table) — seeded with a real Grade 3/4
+  topic progression for Mathematics, Science, and English, matching the
+  master prompt's section 3 example
+- **Automatic lesson planner** (`lib/lessonPlanner.ts`) — a deterministic,
+  rule-based engine (no AI call, no cost) that turns
+  `(subject, grade, classes/month, duration)` into a proposed day-by-day
+  plan: foundational topics first, revision + assessment days
+  auto-reserved near the end, extra "practice" days generated if a grade
+  has fewer topics than available class slots
+- **Plan review UI** — teacher sees every proposed day, can inline-edit
+  the title/objective/activities/duration of any day, and explicitly
+  **accepts** the plan before it's considered active (nothing is silently
+  applied — see master prompt section 49, "teacher always has final
+  control")
+
+**Not yet built** (later stages): completion tracking after each class,
+the adaptive rescheduling engine, live classroom, whiteboard, games,
+assignments, tests, fee/payment management, notifications. See the
+project's master prompt for the full roadmap and build order.
+
+### Design note: why the planner is rule-based, not AI-generated
+
+Section 58/59 of the master prompt calls for a modular, optional AI layer
+and deterministic logic wherever it's sufficient. This stage ships the
+deterministic version — it's free to run, fully explainable, and doesn't
+need any API key configured. A future stage can add an AI material-analysis
+step that reads uploaded PDFs and proposes *additions* to the `topics`
+table; the planner itself won't need to change since it already just reads
+from that table.
 
 ## Local setup
 
@@ -50,8 +81,8 @@ npx supabase db push
 ```
 
 Or, if you don't want to install the CLI: open the Supabase dashboard →
-SQL Editor, and paste the contents of `supabase/migrations/0001_core_schema.sql`
-then `supabase/migrations/0002_handle_new_user.sql`, in that order.
+SQL Editor, and paste the contents of each file in `supabase/migrations/`
+**in numeric order** — `0001`, `0002`, `0003`, `0004`.
 
 ### Enable phone auth (for parent OTP login)
 
@@ -80,16 +111,37 @@ app/
   teacher/dashboard/      teacher shell
   student/dashboard/      student shell
   parent/dashboard/       parent shell
+  teacher/classes/         class list, create-class form
+  teacher/classes/[id]/    class detail: materials + plan generation
+  teacher/classes/[id]/plan/  plan review/edit/accept
+  api/classes/[id]/generate-plan/  route handler that runs the planner
 lib/supabase/
   client.ts               browser Supabase client
   server.ts               server + admin Supabase clients
+lib/lessonPlanner.ts       deterministic lesson-plan generation engine
+components/
+  MaterialUploader.tsx    file upload to Supabase Storage
+  GeneratePlanButton.tsx  triggers the planner via the API route
+  LessonPlanReview.tsx    inline-edit + accept UI for a generated plan
 middleware.ts             session refresh + role-based route protection
 supabase/migrations/      SQL migrations (run in numeric order)
 ```
 
-## Stage 2 (next)
+## Known limitations (Stage 2)
 
-- Teacher: create a tuition class (grade, subject, classes/month, duration, fee)
-- Material upload (PDF/PPT/images) to Supabase Storage
-- Automatic lesson plan generation from uploaded syllabus
-- Teacher review/edit UI for the generated plan
+- If a grade/subject combination has more syllabus topics than the
+  teacher's `classes_per_month`, the extra topics are simply not scheduled
+  this month rather than being carried forward — a real "next month
+  rollover" would need a stage of its own.
+- Regenerating a plan **replaces** the existing draft/accepted plan
+  entirely (including any manual edits) — there's no diff/merge yet.
+- No file preview/analysis of uploaded materials yet — they're stored and
+  downloadable, but the planner doesn't read their contents (see the
+  design note above on the AI layer).
+
+## Stage 3 (next)
+
+- Post-class "how much was completed?" check-in (section 6)
+- Adaptive rescheduling engine that proposes schedule changes when a topic
+  runs over, with explicit teacher accept/edit/reject (never silent)
+- Student- and topic-level progress tracking

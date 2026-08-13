@@ -127,6 +127,26 @@ middleware.ts             session refresh + role-based route protection
 supabase/migrations/      SQL migrations (run in numeric order)
 ```
 
+## Migration 0005: RLS recursion fix
+
+If you ran migrations 0001–0004 before this fix landed, you'll hit
+`infinite recursion detected in policy for relation "classes"` the first
+time the app actually queries the `classes` table (e.g. creating a class).
+Run `supabase/migrations/0005_fix_rls_recursion.sql` to fix it — it's
+safe to run on top of an existing database, and doesn't touch any data.
+
+**Root cause:** `classes`' policy checked `class_students` to verify
+student enrollment, while `class_students`' policy checked back into
+`classes` to verify teacher ownership — an unbreakable cycle once Postgres
+tries to evaluate either one. The fix moves every cross-table access check
+into a `SECURITY DEFINER` SQL function, which bypasses RLS internally and
+breaks the cycle while preserving identical access rules. This was
+verified against a real local Postgres instance running the actual
+migration files, with an 18-case test matrix covering every role
+(teacher/student/parent, including a second teacher to confirm isolation)
+against every affected table, plus the real INSERT flows the app performs
+(creating a class, generating a plan) — not just policy syntax review.
+
 ## Known limitations (Stage 2)
 
 - If a grade/subject combination has more syllabus topics than the

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { StudentHomework } from "@/components/StudentHomework";
 import { AskTeacher } from "@/components/AskTeacher";
 import { NotificationBell } from "@/components/NotificationBell";
+import Link from "next/link";
 
 export default async function StudentDashboard() {
   const supabase = createClient();
@@ -14,7 +15,7 @@ export default async function StudentDashboard() {
 
   const { data: student } = await supabase
     .from("students")
-    .select("id, grade")
+    .select("id, grade, xp, streak_days")
     .eq("user_id", user.id)
     .single();
 
@@ -80,6 +81,24 @@ export default async function StudentDashboard() {
         .limit(10)
     : { data: [] };
 
+  const { data: availableTests } = classIds.length
+    ? await supabase
+        .from("tests")
+        .select("id, title")
+        .in("class_id", classIds)
+    : { data: [] };
+
+  const { data: myAttempts } = student
+    ? await supabase
+        .from("test_attempts")
+        .select("test_id, status")
+        .eq("student_id", student.id)
+    : { data: [] };
+
+  const attemptedTestIds = new Set(
+    (myAttempts ?? []).filter((a) => a.status === "submitted").map((a) => a.test_id)
+  );
+
   const { data: myDoubts } = student
     ? await supabase
         .from("doubts")
@@ -129,18 +148,59 @@ export default async function StudentDashboard() {
             </section>
           )}
 
-          <div className="mt-6 grid grid-cols-2 gap-3">
+          <div className="mt-4 flex items-center justify-center gap-4 rounded-2xl border-2 border-amber-200 bg-amber-50 p-3">
+            <span className="text-sm font-bold text-amber-800">
+              ⭐ {student?.xp ?? 0} XP
+            </span>
+            {(student?.streak_days ?? 0) > 0 && (
+              <span className="text-sm font-bold text-amber-800">
+                🔥 {student?.streak_days} day streak
+              </span>
+            )}
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <Link
+              href="/student/practice"
+              className="rounded-2xl border-2 border-student bg-student-light p-5 text-center"
+            >
+              <p className="text-3xl">🎮</p>
+              <p className="mt-1 text-sm font-bold text-student">Play &amp; Practice</p>
+            </Link>
             <div className="rounded-2xl border-2 border-slate-200 bg-white p-5 text-center">
               <p className="text-3xl">✏️</p>
               <p className="mt-2 text-2xl font-bold">{pendingCount}</p>
               <p className="text-xs text-slate-500">Homework to do</p>
             </div>
-            <div className="rounded-2xl border-2 border-slate-200 bg-white p-5 text-center">
-              <p className="text-3xl">📚</p>
-              <p className="mt-2 text-2xl font-bold">{materials?.length ?? 0}</p>
-              <p className="text-xs text-slate-500">Study materials</p>
-            </div>
           </div>
+
+          {availableTests && availableTests.length > 0 && (
+            <section className="mt-6">
+              <h2 className="text-lg font-bold">📝 Tests</h2>
+              <ul className="mt-3 space-y-2">
+                {availableTests.map((t) => (
+                  <li
+                    key={t.id}
+                    className="flex items-center justify-between rounded-xl border-2 border-slate-200 bg-white px-4 py-3"
+                  >
+                    <span className="text-sm font-medium">{t.title}</span>
+                    {attemptedTestIds.has(t.id) ? (
+                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
+                        Done
+                      </span>
+                    ) : (
+                      <Link
+                        href={`/student/tests/${t.id}`}
+                        className="rounded-lg bg-student px-3 py-1.5 text-xs font-bold text-white"
+                      >
+                        Start
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section className="mt-6">
             <h2 className="text-lg font-bold">✏️ My Homework</h2>

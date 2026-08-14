@@ -9,6 +9,8 @@ import { AttendanceTaker } from "@/components/AttendanceTaker";
 import { AssignmentManager } from "@/components/AssignmentManager";
 import { DoubtsPanel } from "@/components/DoubtsPanel";
 import { FeePanel, type FeeCycleRow } from "@/components/FeePanel";
+import { QuestionBank, type QuestionRow } from "@/components/QuestionBank";
+import { TestManager, type TestRow } from "@/components/TestManager";
 
 export default async function ClassDetailPage({
   params,
@@ -129,6 +131,40 @@ export default async function ClassDetailPage({
     amount: Number(f.amount),
     status: f.status,
   }));
+
+  const { data: questionRows } = await supabase
+    .from("questions")
+    .select("id, question_type, question_text, options, correct_answer, marks")
+    .eq("class_id", klass.id)
+    .order("created_at", { ascending: false });
+
+  const { data: testRows } = await supabase
+    .from("tests")
+    .select("id, title, time_limit_minutes, test_questions(question_id), test_attempts(score, status)")
+    .eq("class_id", klass.id)
+    .order("created_at", { ascending: false });
+
+  const tests: TestRow[] = (testRows ?? []).map((t) => {
+    const attempts = (Array.isArray(t.test_attempts) ? t.test_attempts : []) as {
+      score: number | null;
+      status: string;
+    }[];
+    const submitted = attempts.filter((a) => a.status === "submitted" && a.score !== null);
+    const avg =
+      submitted.length > 0
+        ? Math.round(
+            (submitted.reduce((s, a) => s + (a.score ?? 0), 0) / submitted.length) * 10
+          ) / 10
+        : null;
+    return {
+      id: t.id,
+      title: t.title,
+      time_limit_minutes: t.time_limit_minutes,
+      question_count: Array.isArray(t.test_questions) ? t.test_questions.length : 0,
+      attempt_count: attempts.length,
+      avg_score: avg,
+    };
+  });
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
@@ -251,6 +287,30 @@ export default async function ClassDetailPage({
             classId={klass.id}
             monthlyFee={klass.monthly_fee !== null ? Number(klass.monthly_fee) : null}
             initialCycles={feeCycles}
+          />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
+        <h2 className="font-semibold">Question Bank</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Questions here power both formal tests and students&apos; practice/game mode.
+        </p>
+        <div className="mt-4">
+          <QuestionBank classId={klass.id} initialQuestions={(questionRows ?? []) as QuestionRow[]} />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
+        <h2 className="font-semibold">Tests</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Build a test from your question bank; scores are graded automatically.
+        </p>
+        <div className="mt-4">
+          <TestManager
+            classId={klass.id}
+            initialTests={tests}
+            availableQuestions={(questionRows ?? []) as QuestionRow[]}
           />
         </div>
       </section>

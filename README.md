@@ -1,4 +1,4 @@
-# LearnNest — Stage 7: In-App Notifications + Landing Page
+# LearnNest — Stage 8: Question Bank, Tests & Practice Games (XP)
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,
@@ -353,6 +353,76 @@ attempt to change the title, body, or recipient — verified by attempting
 to rewrite a "fee due" notification's content, which was rejected, while
 the legitimate `is_read` toggle succeeded.
 
+## What's included in Stage 8
+
+- **Shared question bank** — one set of questions per class powers both
+  formal tests and student practice/games.
+- **Formal tests** (section 19) — teacher builds a test from the bank;
+  student takes it once; auto-graded server-side; teacher sees an
+  average, parent sees their child's score.
+- **Practice / games** (section 12) — student picks up random questions
+  across their enrolled classes, gets immediate right/wrong feedback plus
+  the correct answer (deliberately different from formal tests, which
+  never reveal it), and earns lightweight XP + a daily streak. No public
+  leaderboard, per section 11's guidance against competitive pressure.
+
+### Scoping decision: one engine, not nineteen games
+
+Your spec lists ~19 named games (Math Race, Number Ninja, Plant Doctor,
+etc.). Building each as a bespoke mechanic would be weeks of work and,
+more importantly, mostly reproduce the same skeleton — question,
+answer, feedback, score — with different chrome. What's built instead is
+the shared engine section 12 actually asks for ("a reusable game engine
+so new games can be added later"): `practice_check_answer` + the question
+bank. A new "game" going forward is a new presentation layer (a timer, a
+different visual theme, a matching-pairs UI) over this same backend, not
+a new subsystem. Named, subject-themed games with distinct visuals are
+future work.
+
+### Security: the correct answer never reaches the client
+
+This is the highest-stakes data-exposure surface built so far — unlike a
+grade or a payment, a leaked answer key is silently exploitable and
+nobody would ever notice. RLS is row-level, not column-level, so merely
+"trusting the app UI to not query correct_answer" would leave it
+reachable by anyone calling the Supabase REST API directly. Instead,
+students have **no RLS policy at all** on the base `questions` table —
+verified: a direct `select * from questions` returns zero rows for a
+student, and explicitly `select correct_answer` returns zero rows too.
+They read questions only through `questions_for_students`, a view whose
+column list structurally does not include `correct_answer` — confirmed
+by inspecting `information_schema.columns` for the view.
+
+Grading itself happens inside `SECURITY DEFINER` functions
+(`submit_test_attempt`, `practice_check_answer`) that read the real
+answer server-side and never return it (formal tests) or return it only
+after the student has already answered (practice, for learning value).
+A trigger guard blocks a student from inserting a test answer with
+`is_correct`/`marks_awarded` already set — the same pattern as the
+grade-tampering fix in Stage 5.
+
+Verified against real Postgres, 12 cases: the column-exposure checks
+above; practice mode awards XP only for a genuinely correct answer and
+only within a class the student is enrolled in (tested with a real
+question id from a class they're not in, not just a blocked lookup);
+auto-grading scored a real two-question attempt correctly (2/2 marks +
+0/3 marks) without the student ever touching the answer key; a student
+cannot pre-set their own grade or resubmit a graded attempt; a
+classmate's attempt is invisible; parent and teacher see the score
+through their own separate, correctly-scoped policies.
+
+## Known limitations (Stage 8)
+
+- Only 4 question types (MCQ, true/false, fill-in-blank, numerical) —
+  all auto-gradable by exact/numeric match. No image-based or
+  open-ended questions, which would need manual teacher grading.
+- No badges/achievements beyond XP + streak — section 34's certificates
+  and named achievements aren't built.
+- A test can be attempted only once; no multi-attempt or review-after
+  mode.
+- Practice mode pulls from all the student's enrolled classes at once
+  rather than letting them pick a subject first.
+
 ## Known limitations (Stage 7)
 
 - In-app only. Email/SMS/WhatsApp channels need real provider credentials
@@ -435,7 +505,7 @@ the legitimate `is_read` toggle succeeded.
   downloadable, but the planner doesn't read their contents (see the
   design note above on the AI layer).
 
-## Stage 8 (next) — and a note on what's realistically left
+## Stage 9 (next) — and a note on what's realistically left
 
 The remaining spec sections split into two very different kinds of work:
 

@@ -1,4 +1,4 @@
-# LearnNest — Stage 6: Parent Email Login + Fees & Payments
+# LearnNest — Stage 7: In-App Notifications + Landing Page
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,
@@ -324,6 +324,46 @@ between the teacher and the parent, and a child shouldn't be shown what
 their family owes (section 39). Verified: a student's query on
 `fee_cycles` returns zero rows.
 
+## What's included in Stage 7
+
+- **In-app notifications** (section 30) — a `notifications` table with
+  database triggers that fire automatically off events already happening
+  in the app: enrolled in a class, new/answered doubt, new/graded
+  submission, fee due, payment received. No route had to be modified to
+  "remember" to notify someone; the trigger lives with the data change.
+- **Notification bell** on all three dashboards — unread count, dropdown
+  list, click-through to the relevant page, mark-as-read.
+- **Real landing page** (section 56) — hero, "how it works," feature
+  grid, and a call to action, replacing the placeholder stub.
+
+### Design note: why triggers, not application code
+
+Putting notification creation in triggers rather than in each API route
+means it's structurally impossible to grade a submission, answer a
+doubt, or mark a fee due *without* the notification firing — there's no
+route to forget to update. The tradeoff is that the logic lives in SQL
+rather than TypeScript; each trigger is short and commented with which
+event it's for.
+
+### Integrity guard
+
+Same class of protection as the payment guards in Stage 6: a user can
+toggle `is_read` on their own notification, but a trigger rejects any
+attempt to change the title, body, or recipient — verified by attempting
+to rewrite a "fee due" notification's content, which was rejected, while
+the legitimate `is_read` toggle succeeded.
+
+## Known limitations (Stage 7)
+
+- In-app only. Email/SMS/WhatsApp channels need real provider credentials
+  — the `notifications` table is structured so a `channel` + `sent_at`
+  pair could be added without reshaping anything, same pattern as the
+  payment adapter.
+- No push notifications (would need a service worker + browser
+  permission flow).
+- The bell polls once on page load, not real-time — a live update would
+  need Supabase Realtime subscriptions.
+
 ## Known limitations (Stage 6)
 
 - Payments run through the mock adapter. Real card/UPI needs Razorpay
@@ -395,9 +435,21 @@ their family owes (section 39). Verified: a student's query on
   downloadable, but the planner doesn't read their contents (see the
   design note above on the AI layer).
 
-## Stage 7 (next)
+## Stage 8 (next) — and a note on what's realistically left
 
-- Notifications (section 30), starting in-app
-- Live classroom + whiteboard — these need LiveKit (or equivalent)
+The remaining spec sections split into two very different kinds of work:
+
+**Buildable and verifiable here:** educational games (a reusable game
+engine + a first few games), a simple quiz/test engine, achievements/
+badges, a calendar view, search. These don't need external credentials
+and can be tested the same way everything above was.
+
+**Blocked on external setup:** the live classroom and collaborative
+whiteboard need LiveKit (or equivalent) credentials and real-time
+infrastructure this sandbox can't exercise — no second browser, no
+WebRTC peer. Real Razorpay payments need live keys. Real email/SMS/
+WhatsApp need provider accounts. Building these blind, the way the RLS
+bug nearly shipped in Stage 1, is a worse outcome than waiting for
+credentials. — these need LiveKit (or equivalent)
   credentials and real-time infrastructure, so they're best built once
   those are available rather than shipped unverified

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { StudentHomework } from "@/components/StudentHomework";
 import { AskTeacher } from "@/components/AskTeacher";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export default async function StudentDashboard() {
   const supabase = createClient();
@@ -94,6 +95,9 @@ export default async function StudentDashboard() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
+      <div className="mb-3 flex justify-end">
+        <NotificationBell accentColor="student" />
+      </div>
       <div className="rounded-2xl border-2 border-student-light bg-white p-6 text-center shadow-sm">
         <p className="text-lg font-medium text-student">
           Hi {user.user_metadata?.full_name ?? "there"}! 👋

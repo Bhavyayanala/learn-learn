@@ -1,4 +1,4 @@
-# LearnNest — Stage 4: Enrollment + Attendance + Teacher Dashboard
+# LearnNest — Stage 5: Student & Parent Dashboards + Assignments
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,
@@ -117,6 +117,7 @@ app/
   api/classes/[id]/generate-plan/  route handler that runs the planner
   api/classes/[id]/enroll/  enroll a student by email
   api/classes/[id]/sessions/  create a session + seed its attendance roster
+  api/parent/link-child/  link a parent to a child by student email
   api/lesson-plan-items/[id]/complete/  completion check-in + reschedule trigger
   api/schedule-proposals/[id]/resolve/  accept/reject a reschedule proposal
 lib/supabase/
@@ -131,6 +132,11 @@ components/
   DeleteClassButton.tsx   confirm-then-delete a class
   StudentEnrollment.tsx   enroll/remove students on a class
   AttendanceTaker.tsx     per-session attendance marking
+  AssignmentManager.tsx   teacher: create assignments, grade submissions
+  DoubtsPanel.tsx         teacher: view and answer student questions
+  StudentHomework.tsx     student: view/submit homework, see grades
+  AskTeacher.tsx          student: raise a question
+  LinkChild.tsx           parent: link a child by email
 middleware.ts             session refresh + role-based route protection
 supabase/migrations/      SQL migrations (run in numeric order)
 ```
@@ -213,6 +219,63 @@ The enroll route therefore verifies class ownership through normal RLS
 returning nothing beyond whether it matched. Verified: under normal RLS a
 teacher's `select * from users` returns exactly one row (their own).
 
+## What's included in Stage 5
+
+All three roles are now real, end-to-end.
+
+- **Student dashboard** — kid-friendly per master prompt section 9: large
+  buttons, emoji, minimal text. Shows today's mission (next incomplete
+  topic), homework count, study materials, and an "Ask Your Teacher" box
+- **Assignments / homework** (section 18) — teacher creates assignments
+  with instructions, due date, and max marks; students submit a written
+  response; teacher grades with marks and a comment; the grade flows back
+  to the student's dashboard and the parent's
+- **Doubts / Ask Teacher** (section 20) — student raises a question,
+  teacher answers it from the class page, student sees the reply
+- **Parent–child linking + parent dashboard** (sections 23–24) — a parent
+  links a child by the email the child signed up with, then sees per-child
+  attendance, homework completion, and average score
+
+### Security: column-level integrity guards
+
+RLS can grant or deny access to a *row*, but it cannot restrict which
+*columns* an UPDATE touches. Testing caught a real vulnerability from
+this: a student could satisfy the "update your own submission" policy
+(there so they can revise their answer) and change their own
+`marks_awarded` — verified by successfully raising a grade from 8 to 10.
+
+The fix is a pair of `BEFORE UPDATE` trigger guards that reject changes to
+the grading fields (`marks_awarded`, `teacher_comment`, `status`) and the
+answer fields (`answer`, `status`, `answered_at`) unless the caller is the
+owning teacher. Re-verified after the fix: the tampering attempt now
+raises an exception, while legitimate actions still work — a student can
+still revise their answer text, and a teacher can still grade and answer.
+
+### Privacy boundaries (verified, not just intended)
+
+- A student sees only their **own** homework submission, never a
+  classmate's
+- A student sees only their **own** questions
+- A parent sees only their **own** child's submissions and grades
+- A parent **cannot** see their child's questions to the teacher — a
+  child should be able to ask for help without it being surfaced to a
+  parent (master prompt section 39)
+- A second teacher sees zero assignments, submissions, or doubts
+
+## Known limitations (Stage 5)
+
+- Assignments are free-text response only. Section 18's MCQ, fill-in-blank,
+  numerical, and file-upload types aren't built, so nothing is
+  auto-graded yet.
+- Doubts are text only — no photo upload, drawing, or voice reply.
+- The student dashboard shows the next incomplete topic across all their
+  classes rather than resolving "today's" class against the calendar.
+- The parent dashboard's homework total counts all assignments visible to
+  that parent rather than scoping per-child-per-class, which is only
+  correct while a child is in a single class.
+- No notifications yet (section 30) — a parent won't be told when a grade
+  lands; they have to open the dashboard.
+
 ## Known limitations (Stage 4)
 
 - Enrollment requires the student to have signed up already; there is no
@@ -258,10 +321,12 @@ teacher's `select * from users` returns exactly one row (their own).
   downloadable, but the planner doesn't read their contents (see the
   design note above on the AI layer).
 
-## Stage 5 (next)
+## Stage 6 (next)
 
-- Student dashboard (their class, today's topic, materials)
-- Parent–child linking, then the parent dashboard
+- Fee cycles and payment status (sections 27–29) — the Razorpay
+  integration itself needs real credentials, but the fee-cycle logic and
+  a mock payment adapter can be built and tested now
+- Notifications (section 30), starting in-app
 - Live classroom + whiteboard — these need LiveKit (or equivalent)
   credentials and real-time infrastructure, so they're best built once
   those are available rather than shipped unverified

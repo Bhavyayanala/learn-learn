@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LinkChild } from "@/components/LinkChild";
+import { ParentFees, type ParentFeeCycle } from "@/components/ParentFees";
 
 type ChildSummary = {
   studentId: string;
@@ -86,6 +87,24 @@ export default async function ParentDashboard() {
     });
   }
 
+  // RLS limits this to fee cycles for this parent's own children.
+  const { data: feeRows } = await supabase
+    .from("fee_cycles")
+    .select("id, period_label, classes_planned, classes_completed, amount, status, student_id")
+    .order("period_label", { ascending: false });
+
+  const nameByStudentId = new Map(children.map((c) => [c.studentId, c.name]));
+
+  const feeCycles: ParentFeeCycle[] = (feeRows ?? []).map((f) => ({
+    id: f.id,
+    child_name: nameByStudentId.get(f.student_id) ?? "Your child",
+    period_label: f.period_label,
+    classes_planned: f.classes_planned,
+    classes_completed: f.classes_completed,
+    amount: Number(f.amount),
+    status: f.status,
+  }));
+
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <div className="rounded-2xl border border-parent-light bg-white p-6 shadow-sm">
@@ -153,6 +172,13 @@ export default async function ParentDashboard() {
               )}
             </section>
           ))}
+
+          <section className="mt-6 rounded-2xl border border-parent-light bg-white p-6 shadow-sm">
+            <h2 className="font-semibold">Tuition Fees</h2>
+            <div className="mt-4">
+              <ParentFees cycles={feeCycles} />
+            </div>
+          </section>
 
           <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5">
             <h2 className="text-sm font-semibold text-slate-600">

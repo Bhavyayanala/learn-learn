@@ -61,7 +61,7 @@ export default function LoginPage() {
     });
     setLoading(false);
     if (error) return setError(error.message);
-    router.push("/parent/dashboard");
+    await redirectByRole();
   }
 
   return (
@@ -77,7 +77,7 @@ export default function LoginPage() {
               : "border-slate-200 text-slate-500"
           }`}
         >
-          Teacher / Student
+          Email &amp; password
         </button>
         <button
           onClick={() => setMode("otp")}
@@ -87,7 +87,7 @@ export default function LoginPage() {
               : "border-slate-200 text-slate-500"
           }`}
         >
-          Parent (OTP)
+          Mobile OTP
         </button>
       </div>
 

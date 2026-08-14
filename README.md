@@ -1,4 +1,4 @@
-# LearnNest — Stage 5: Student & Parent Dashboards + Assignments
+# LearnNest — Stage 6: Parent Email Login + Fees & Payments
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,
@@ -262,6 +262,80 @@ still revise their answer text, and a teacher can still grade and answer.
   parent (master prompt section 39)
 - A second teacher sees zero assignments, submissions, or doubts
 
+## What's included in Stage 6
+
+- **Email/password login for parents** — phone OTP is still there and
+  still preferred, but it needs an SMS provider (and in India, DLT sender
+  registration, which costs money and takes days). Parents can now choose
+  either method at signup. This unblocks development and is a reasonable
+  product choice regardless: a parent without a usable phone can still
+  see their child's progress.
+- **Fee cycles** (sections 26-27) — one cycle per student per class per
+  month, tracking classes planned vs completed and the amount owed. A
+  cycle flips from `active` to `due` once the planned number of classes
+  has actually been completed.
+- **Payments with a mock gateway** (section 28) — teacher generates the
+  month's fees; parent pays from their dashboard and gets a receipt
+  reference. Razorpay isn't wired up (no credentials), so this runs
+  through a development adapter.
+
+### Payment architecture
+
+`lib/payments/adapter.ts` defines a gateway-agnostic interface with
+`createOrder` and `verifyPayment`. Only the mock adapter is implemented;
+adding Razorpay means implementing the same interface and recomputing the
+HMAC signature in `verifyPayment` — no route or UI changes. The mock
+deliberately is not a rubber stamp: it checks that the payment id matches
+the order id it issued, so the verification code path exercised in
+development is structurally the same one a real gateway drives.
+
+### Security: server-side payment verification
+
+Section 28 requires that a payment is never reported successful without
+server-side verification. Enforcement is at the database level, not just
+in application code: trigger guards reject any attempt to create or
+update a payment to `success` unless the request is running as
+`service_role`. So even a fully compromised browser cannot mark a fee
+cycle paid — it must go through `/api/payments/[id]/verify`, which only
+sets success after the adapter confirms the payment.
+
+Two real bugs were found and fixed while testing this:
+
+1. The first version of the guard blocked *everyone*, including the
+   legitimate server route — RLS is bypassed by the service role but
+   triggers are not, so the verify route would have silently failed in
+   production (the update affected 0 rows).
+2. The second version used `current_user` inside a `SECURITY DEFINER`
+   function, where `current_user` is rewritten to the function's owner —
+   so the check silently passed for everyone, and a parent successfully
+   inserted a payment row already marked `success`. The guards are now
+   `SECURITY INVOKER`, where `current_user` is the role the request
+   actually runs as. (`session_user` is not usable here either: PostgREST
+   connects as `authenticator` and then `SET ROLE`s, so it's identical
+   for client and server requests.)
+
+Both are the kind of bug that looks correct on reading and only surfaces
+when executed against a real database.
+
+### Privacy
+
+Students have **no** access to fee or payment data at all — money is
+between the teacher and the parent, and a child shouldn't be shown what
+their family owes (section 39). Verified: a student's query on
+`fee_cycles` returns zero rows.
+
+## Known limitations (Stage 6)
+
+- Payments run through the mock adapter. Real card/UPI needs Razorpay
+  credentials in `.env.local` and a Razorpay adapter implementing the
+  existing interface.
+- Fee cycles are generated on demand by the teacher, not automatically at
+  month end — section 29's automatic reminder needs a scheduled job.
+- No notifications yet: a parent isn't told a fee is due, they have to
+  open the dashboard.
+- Parent phone OTP still requires a configured SMS provider; email is the
+  practical default until that's set up.
+
 ## Known limitations (Stage 5)
 
 - Assignments are free-text response only. Section 18's MCQ, fill-in-blank,
@@ -321,11 +395,8 @@ still revise their answer text, and a teacher can still grade and answer.
   downloadable, but the planner doesn't read their contents (see the
   design note above on the AI layer).
 
-## Stage 6 (next)
+## Stage 7 (next)
 
-- Fee cycles and payment status (sections 27–29) — the Razorpay
-  integration itself needs real credentials, but the fee-cycle logic and
-  a mock payment adapter can be built and tested now
 - Notifications (section 30), starting in-app
 - Live classroom + whiteboard — these need LiveKit (or equivalent)
   credentials and real-time infrastructure, so they're best built once

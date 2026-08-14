@@ -11,6 +11,10 @@ export default function SignupPage() {
   const supabase = createClient();
 
   const [role, setRole] = useState<Role>("teacher");
+  // Parents can sign up with email/password or phone OTP. Email is the
+  // default because phone OTP needs a configured SMS provider (and, in
+  // India, DLT sender registration), which many deployments won't have.
+  const [parentMethod, setParentMethod] = useState<"email" | "phone">("email");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -103,7 +107,30 @@ export default function SignupPage() {
         ))}
       </div>
 
-      {role !== "parent" ? (
+      {role === "parent" && (
+        <div className="flex gap-2">
+          {(["email", "phone"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => {
+                setParentMethod(m);
+                setError(null);
+                setOtpSent(false);
+              }}
+              className={`flex-1 rounded-lg border px-3 py-1.5 text-xs ${
+                parentMethod === m
+                  ? "border-parent bg-parent-light font-medium"
+                  : "border-slate-200 text-slate-500"
+              }`}
+            >
+              {m === "email" ? "Use email" : "Use mobile OTP"}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {role !== "parent" || parentMethod === "email" ? (
         <form onSubmit={handleEmailSignup} className="flex flex-col gap-3">
           <input
             required
@@ -142,7 +169,13 @@ export default function SignupPage() {
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             disabled={loading}
-            className="rounded-lg bg-teacher px-4 py-2 font-medium text-white disabled:opacity-50"
+            className={`rounded-lg px-4 py-2 font-medium text-white disabled:opacity-50 ${
+              role === "parent"
+                ? "bg-parent"
+                : role === "student"
+                  ? "bg-student"
+                  : "bg-teacher"
+            }`}
           >
             {loading ? "Creating account…" : "Sign up"}
           </button>

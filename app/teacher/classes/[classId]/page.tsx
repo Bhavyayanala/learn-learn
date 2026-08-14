@@ -8,6 +8,7 @@ import { StudentEnrollment, type EnrolledStudent } from "@/components/StudentEnr
 import { AttendanceTaker } from "@/components/AttendanceTaker";
 import { AssignmentManager } from "@/components/AssignmentManager";
 import { DoubtsPanel } from "@/components/DoubtsPanel";
+import { FeePanel, type FeeCycleRow } from "@/components/FeePanel";
 
 export default async function ClassDetailPage({
   params,
@@ -111,6 +112,22 @@ export default async function ClassDetailPage({
     status: d.status,
     created_at: d.created_at,
     student_name: resolveName(d.students),
+  }));
+
+  const { data: feeCycleRows } = await supabase
+    .from("fee_cycles")
+    .select("id, period_label, classes_planned, classes_completed, amount, status, students(users(full_name))")
+    .eq("class_id", klass.id)
+    .order("period_label", { ascending: false });
+
+  const feeCycles: FeeCycleRow[] = (feeCycleRows ?? []).map((f) => ({
+    id: f.id,
+    student_name: resolveName(f.students),
+    period_label: f.period_label,
+    classes_planned: f.classes_planned,
+    classes_completed: f.classes_completed,
+    amount: Number(f.amount),
+    status: f.status,
   }));
 
   return (
@@ -220,6 +237,21 @@ export default async function ClassDetailPage({
         </p>
         <div className="mt-4">
           <DoubtsPanel initialDoubts={doubts} />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
+        <h2 className="font-semibold">Tuition Fees</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Generate this month&apos;s fees. A cycle becomes due once the
+          planned number of classes has been completed.
+        </p>
+        <div className="mt-4">
+          <FeePanel
+            classId={klass.id}
+            monthlyFee={klass.monthly_fee !== null ? Number(klass.monthly_fee) : null}
+            initialCycles={feeCycles}
+          />
         </div>
       </section>
 

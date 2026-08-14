@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { MaterialUploader } from "@/components/MaterialUploader";
 import { GeneratePlanButton } from "@/components/GeneratePlanButton";
 import { DeleteClassButton } from "@/components/DeleteClassButton";
+import { StudentEnrollment, type EnrolledStudent } from "@/components/StudentEnrollment";
+import { AttendanceTaker } from "@/components/AttendanceTaker";
 
 export default async function ClassDetailPage({
   params,
@@ -41,6 +43,25 @@ export default async function ClassDetailPage({
     .select("id, status")
     .eq("class_id", klass.id)
     .maybeSingle();
+
+  const { data: enrolledRows } = await supabase
+    .from("class_students")
+    .select("student_id, students(grade, users(full_name))")
+    .eq("class_id", klass.id);
+
+  const enrolledStudents: EnrolledStudent[] = (enrolledRows ?? []).map((row) => {
+    const studentRel = Array.isArray(row.students) ? row.students[0] : row.students;
+    const userRel = studentRel
+      ? Array.isArray((studentRel as { users: unknown }).users)
+        ? ((studentRel as { users: { full_name: string }[] }).users)[0]
+        : ((studentRel as unknown as { users: { full_name: string } | null }).users)
+      : null;
+    return {
+      student_id: row.student_id,
+      full_name: userRel?.full_name ?? "Student",
+      grade: (studentRel as { grade?: string } | null)?.grade ?? "",
+    };
+  });
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
@@ -102,6 +123,33 @@ export default async function ClassDetailPage({
           ) : (
             <GeneratePlanButton classId={klass.id} />
           )}
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
+        <h2 className="font-semibold">Students</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Enroll students by the email they signed up with.
+        </p>
+        <div className="mt-4">
+          <StudentEnrollment
+            classId={klass.id}
+            initialStudents={enrolledStudents}
+          />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
+        <h2 className="font-semibold">Attendance</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Pick a date and mark who attended. Everyone starts as present —
+          just change the ones who weren&apos;t.
+        </p>
+        <div className="mt-4">
+          <AttendanceTaker
+            classId={klass.id}
+            hasStudents={enrolledStudents.length > 0}
+          />
         </div>
       </section>
 

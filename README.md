@@ -1,4 +1,4 @@
-# LearnNest — Stage 3: Delete Class + Adaptive Rescheduling + Progress Tracking
+# LearnNest — Stage 4: Enrollment + Attendance + Teacher Dashboard
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,
@@ -115,6 +115,8 @@ app/
   teacher/classes/[id]/    class detail: materials + plan generation
   teacher/classes/[id]/plan/  plan review/edit/accept + completion check-in
   api/classes/[id]/generate-plan/  route handler that runs the planner
+  api/classes/[id]/enroll/  enroll a student by email
+  api/classes/[id]/sessions/  create a session + seed its attendance roster
   api/lesson-plan-items/[id]/complete/  completion check-in + reschedule trigger
   api/schedule-proposals/[id]/resolve/  accept/reject a reschedule proposal
 lib/supabase/
@@ -127,6 +129,8 @@ components/
   GeneratePlanButton.tsx  triggers the planner via the API route
   LessonPlanReview.tsx    inline-edit, accept, completion check-in, reschedule UI
   DeleteClassButton.tsx   confirm-then-delete a class
+  StudentEnrollment.tsx   enroll/remove students on a class
+  AttendanceTaker.tsx     per-session attendance marking
 middleware.ts             session refresh + role-based route protection
 supabase/migrations/      SQL migrations (run in numeric order)
 ```
@@ -177,6 +181,52 @@ against every affected table, plus the real INSERT flows the app performs
 assignments, tests, fee/payment management, notifications, and true
 per-student progress differentiation (see limitations below).
 
+## What's included in Stage 4
+
+- **Student enrollment** — teacher enrolls students into a class by the
+  email they signed up with, and can remove them. Until now `class_students`
+  existed but nothing could populate it, which blocked attendance,
+  per-student progress, and the parent dashboard
+- **Attendance** — `class_sessions` records an actual class that happened;
+  `attendance` hangs off a session (not off a plan day) so a rescheduled or
+  repeated day still gets a clean record. Teacher picks a date, the roster
+  seeds everyone as present, and they toggle present/late/absent/excused
+- **Real teacher dashboard** — replaces the placeholder shell with live
+  aggregates: class count, total students, a "needs your attention" panel
+  (pending schedule proposals, un-accepted draft plans), and a per-class
+  syllabus progress bar
+
+### Privacy note on attendance
+
+A student can see only their **own** attendance row, never a classmate's;
+a parent sees only their own child's. This is enforced by RLS at the
+database level, not just hidden in the UI, and is verified by the test
+matrix described below (master prompt sections 39 and 60).
+
+### Design note: why enrollment uses the admin client
+
+A teacher has no RLS visibility into a student who isn't already enrolled
+with them — deliberately, so teachers can't browse the full user table.
+That means looking a student up by email needs the service-role client.
+The enroll route therefore verifies class ownership through normal RLS
+*first*, and only then uses the admin client for the single email lookup,
+returning nothing beyond whether it matched. Verified: under normal RLS a
+teacher's `select * from users` returns exactly one row (their own).
+
+## Known limitations (Stage 4)
+
+- Enrollment requires the student to have signed up already; there is no
+  invite-by-email flow that provisions an account.
+- A parent account is created at signup but nothing yet links a parent to
+  a child — `parent_students` has no UI, so the parent dashboard can't be
+  built until that exists.
+- Attendance is recorded manually. Master prompt section 25 wants it
+  captured automatically when a student joins a live class, which depends
+  on the classroom stage.
+- The dashboard queries per class in a loop, which is fine at tuition
+  scale (a handful of classes) but would want a single aggregate query if
+  a teacher ever ran dozens.
+
 ## Known limitations (Stage 3)
 
 - Rescheduling only handles the single-day-ran-over case (insert one
@@ -208,10 +258,10 @@ per-student progress differentiation (see limitations below).
   downloadable, but the planner doesn't read their contents (see the
   design note above on the AI layer).
 
-## Stage 4 (next)
+## Stage 5 (next)
 
-- Attendance tracking on class join
-- Live classroom (video, screen share, chat)
-- Interactive whiteboard
-- Assignments and tests, which will make true per-student progress
-  tracking meaningful
+- Student dashboard (their class, today's topic, materials)
+- Parent–child linking, then the parent dashboard
+- Live classroom + whiteboard — these need LiveKit (or equivalent)
+  credentials and real-time infrastructure, so they're best built once
+  those are available rather than shipped unverified

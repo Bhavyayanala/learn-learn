@@ -4,6 +4,7 @@ import { StudentHomework } from "@/components/StudentHomework";
 import { AskTeacher } from "@/components/AskTeacher";
 import { NotificationBell } from "@/components/NotificationBell";
 import Link from "next/link";
+import { BadgeShelf } from "@/components/BadgeShelf";
 
 export default async function StudentDashboard() {
   const supabase = createClient();
@@ -98,6 +99,24 @@ export default async function StudentDashboard() {
   const attemptedTestIds = new Set(
     (myAttempts ?? []).filter((a) => a.status === "submitted").map((a) => a.test_id)
   );
+
+  const { data: earnedBadges } = student
+    ? await supabase
+        .from("student_badges")
+        .select("earned_at, badges(code, title, emoji, description)")
+        .eq("student_id", student.id)
+    : { data: [] };
+
+  const badges = (earnedBadges ?? []).map((eb) => {
+    const b = Array.isArray(eb.badges) ? eb.badges[0] : eb.badges;
+    return {
+      code: (b as { code: string })?.code ?? "",
+      title: (b as { title: string })?.title ?? "",
+      emoji: (b as { emoji: string })?.emoji ?? "🏅",
+      description: (b as { description: string })?.description ?? "",
+      earned_at: eb.earned_at,
+    };
+  });
 
   const { data: myDoubts } = student
     ? await supabase
@@ -228,6 +247,13 @@ export default async function StudentDashboard() {
               </ul>
             </section>
           )}
+
+          <section className="mt-6">
+            <h2 className="text-lg font-bold">🏆 My Badges</h2>
+            <div className="mt-3">
+              <BadgeShelf badges={badges} />
+            </div>
+          </section>
 
           <section className="mt-6">
             <h2 className="text-lg font-bold">💬 Ask Your Teacher</h2>

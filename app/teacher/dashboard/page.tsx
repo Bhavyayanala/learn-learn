@@ -145,6 +145,18 @@ export default async function TeacherDashboard() {
           >
             + Create a Class
           </Link>
+          <Link
+            href="/teacher/calendar"
+            className="rounded-xl border border-slate-300 px-4 py-2.5 font-medium text-slate-600 hover:bg-slate-50"
+          >
+            📅 Calendar
+          </Link>
+          <Link
+            href="/teacher/search"
+            className="rounded-xl border border-slate-300 px-4 py-2.5 font-medium text-slate-600 hover:bg-slate-50"
+          >
+            🔍 Search
+          </Link>
         </div>
       </div>
 

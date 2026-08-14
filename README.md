@@ -1,4 +1,4 @@
-# LearnNest — Stage 8: Question Bank, Tests & Practice Games (XP)
+# LearnNest — Stage 9: Badges + Calendar + Search
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,
@@ -411,6 +411,48 @@ cannot pre-set their own grade or resubmit a graded attempt; a
 classmate's attempt is invisible; parent and teacher see the score
 through their own separate, correctly-scoped policies.
 
+## What's included in Stage 9
+
+- **Badges** (section 34, kept light) — 6 milestone badges auto-awarded
+  by database triggers off data that already exists: practice streak (3/7
+  days), XP totals (50/200), homework count (5 submissions), and a
+  perfect test score. Visible only to the student who earned it and
+  their parent/teacher — no leaderboard, per section 11.
+- **Teacher calendar/agenda** (section 46) — upcoming scheduled lesson
+  days and assignment due dates across all the teacher's classes, in one
+  chronological list.
+- **Teacher search** (section 45) — one search box across students,
+  materials, assignments, tests, and doubts, all scoped by the same RLS
+  policies as everywhere else in the app (fetch-then-filter client-side,
+  which is safe and fast at tuition scale since RLS already limits each
+  fetch to the teacher's own data).
+
+### Security
+
+Badges can only be written by the trigger functions (`SECURITY DEFINER`,
+bypass RLS on write) — no client role has an INSERT policy on
+`student_badges` at all. Verified: a student's direct attempt to insert
+a badge for themselves is rejected by RLS, and the badge count is
+unaffected.
+
+Verified against real Postgres: crossing the XP threshold mid-practice-
+session correctly auto-awards the badge in the same transaction, a
+student sees only their own badges, and the forgery attempt above is
+blocked.
+
+## Known limitations (Stage 9)
+
+- No certificate *files* — section 34 also asks for a downloadable
+  certificate; what's built is the badge record, not a generated
+  PDF/image. Certificate generation is a reasonable follow-up using the
+  same student_badges data.
+- The agenda is teacher-only; a student/parent version would reuse the
+  same `Agenda` component against their own scoped queries.
+- Search is client-side substring matching after an RLS-scoped fetch,
+  fine at tuition scale (dozens of students/items) but wouldn't scale to
+  a school-sized deployment without moving to server-side full-text
+  search.
+
 ## Known limitations (Stage 8)
 
 - Only 4 question types (MCQ, true/false, fill-in-blank, numerical) —
@@ -505,21 +547,37 @@ through their own separate, correctly-scoped policies.
   downloadable, but the planner doesn't read their contents (see the
   design note above on the AI layer).
 
-## Stage 9 (next) — and a note on what's realistically left
+## What's left
 
-The remaining spec sections split into two very different kinds of work:
+Everything buildable and verifiable without external accounts has been
+built: full auth for all three roles, class creation, materials,
+automatic lesson planning, adaptive rescheduling, attendance,
+assignments, doubts, fee cycles + mock payments, notifications, a
+question bank powering both tests and practice/games, XP, badges, a
+teacher calendar, and search. Every migration in this repo was verified
+against a real local Postgres instance, not just read for correctness —
+that process caught and fixed real bugs, including two payment-forgery
+holes and a grade-tampering hole that looked completely fine on
+inspection and only surfaced once actually executed.
 
-**Buildable and verifiable here:** educational games (a reusable game
-engine + a first few games), a simple quiz/test engine, achievements/
-badges, a calendar view, search. These don't need external credentials
-and can be tested the same way everything above was.
+What's left is genuinely blocked on external setup, not on more time:
 
-**Blocked on external setup:** the live classroom and collaborative
-whiteboard need LiveKit (or equivalent) credentials and real-time
-infrastructure this sandbox can't exercise — no second browser, no
-WebRTC peer. Real Razorpay payments need live keys. Real email/SMS/
-WhatsApp need provider accounts. Building these blind, the way the RLS
-bug nearly shipped in Stage 1, is a worse outcome than waiting for
-credentials. — these need LiveKit (or equivalent)
-  credentials and real-time infrastructure, so they're best built once
-  those are available rather than shipped unverified
+- **Live classroom + collaborative whiteboard** — need LiveKit (or
+  equivalent) credentials and real-time infrastructure this sandbox
+  can't exercise (no second browser, no WebRTC peer to test against).
+- **Real payments** — the mock adapter is fully wired and tested; a
+  Razorpay adapter implementing the same interface is a contained piece
+  of work once you have live keys.
+- **Real email/SMS/WhatsApp** — the notification table and trigger
+  pattern are ready for a `channel` column; sending anything for real
+  needs provider accounts (see the Twilio discussion earlier for what
+  that involves, including DLT registration for India).
+- **Certificates as downloadable files**, a full admin panel, and CI/CD
+  are the remaining named sections from the original spec not covered
+  above — smaller, lower-stakes items than what's built so far.
+
+Building any of the first three blind — the way the RLS recursion bug
+nearly shipped in Stage 1 — would be a worse outcome than waiting for
+credentials. When you're ready to set any of them up, come back and
+we'll build that piece the same way as everything else: real code,
+verified against something real, not just written and hoped for.

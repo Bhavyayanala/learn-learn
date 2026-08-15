@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LinkChild } from "@/components/LinkChild";
 import { ParentFees, type ParentFeeCycle } from "@/components/ParentFees";
-import { NotificationBell } from "@/components/NotificationBell";
 
 type ChildSummary = {
   studentId: string;
@@ -108,9 +107,6 @@ export default async function ParentDashboard() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <div className="mb-3 flex justify-end">
-        <NotificationBell accentColor="parent" />
-      </div>
       <div className="rounded-2xl border border-parent-light bg-white p-6 shadow-sm">
         <p className="text-sm font-medium text-parent">Parent Dashboard</p>
         <h1 className="mt-1 text-2xl font-semibold">

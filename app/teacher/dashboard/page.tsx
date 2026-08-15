@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { NotificationBell } from "@/components/NotificationBell";
 
 type ClassSummary = {
   id: string;
@@ -104,9 +103,6 @@ export default async function TeacherDashboard() {
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10">
-      <div className="mb-3 flex justify-end">
-        <NotificationBell accentColor="teacher" />
-      </div>
       <div className="rounded-2xl border border-teacher-light bg-white p-8 shadow-sm">
         <p className="text-sm font-medium text-teacher">Teacher Dashboard</p>
         <h1 className="mt-1 text-2xl font-semibold">

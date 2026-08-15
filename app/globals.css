@@ -3,11 +3,34 @@
 @tailwind utilities;
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #f7f7fb;
+  --foreground: #1e1b3a;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
+}
+
+/* Signature texture: a faint dot grid, evoking notebook/graph paper —
+   used behind marketing and dashboard chrome, never behind dense text
+   or forms where it would compete with content. */
+.dot-grid {
+  background-image: radial-gradient(circle, rgba(30, 27, 58, 0.08) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+h1, h2, h3, h4 {
+  font-family: "Lexend", system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background-color: #e7e6f9;
+  color: #1e1b3a;
+}
+
+:focus-visible {
+  outline: 2px solid #3730a3;
+  outline-offset: 2px;
 }

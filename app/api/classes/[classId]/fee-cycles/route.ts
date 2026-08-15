@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { sendFeeReminderWhatsApp } from "@/lib/notifications/whatsapp";
 
 // Creates (or refreshes) this month's fee cycle for every student
 // enrolled in a class. Master prompt sections 26-27: once the planned
@@ -107,10 +108,70 @@ export async function POST(
     return NextResponse.json({ error: upsertErr.message }, { status: 500 });
   }
 
+  // Best-effort WhatsApp fee reminders — only for cycles that just
+  // became genuinely due, and never lets a failed/unconfigured send
+  // block the fee cycles themselves from being created. Uses the admin
+  // client because a teacher's own session has no RLS visibility into
+  // the `parents` table for privacy reasons (same justification as the
+  // enroll-by-email lookup elsewhere in this app): this is read-only
+  // contact info needed for a legitimate system notification, not
+  // exposed to the teacher themselves.
+  const dueRows = toUpsert.filter((r) => r.status === "due");
+  let remindersSent = 0;
+  let remindersSkipped = 0;
+
+  if (dueRows.length > 0) {
+    const admin = createAdminClient();
+    const dueStudentIds = dueRows.map((r) => r.student_id);
+
+    const { data: studentNames } = await admin
+      .from("students")
+      .select("id, users(full_name)")
+      .in("id", dueStudentIds);
+
+    const { data: parentLinks } = await admin
+      .from("parent_students")
+      .select("student_id, parents(users(phone))")
+      .in("student_id", dueStudentIds);
+
+    const nameByStudent = new Map(
+      (studentNames ?? []).map((s) => {
+        const u = Array.isArray(s.users) ? s.users[0] : s.users;
+        return [s.id, (u as { full_name?: string } | null)?.full_name ?? "Student"];
+      })
+    );
+
+    for (const link of parentLinks ?? []) {
+      const parent = Array.isArray(link.parents) ? link.parents[0] : link.parents;
+      const u = parent ? (parent as { users: unknown }).users : null;
+      const uu = Array.isArray(u) ? u[0] : u;
+      const phone = (uu as { phone?: string } | null)?.phone;
+
+      if (!phone) {
+        remindersSkipped++;
+        continue;
+      }
+
+      const row = dueRows.find((r) => r.student_id === link.student_id);
+      if (!row) continue;
+
+      const result = await sendFeeReminderWhatsApp({
+        parentPhone: phone,
+        studentName: nameByStudent.get(link.student_id) ?? "Student",
+        amount: row.amount,
+        periodLabel: row.period_label,
+      });
+
+      if (result.sent) remindersSent++;
+      else remindersSkipped++;
+    }
+  }
+
   return NextResponse.json({
     period: periodLabel,
     cyclesCreated: toUpsert.length,
     classesCompleted: completed,
     status,
+    whatsappReminders: { sent: remindersSent, skipped: remindersSkipped },
   });
 }

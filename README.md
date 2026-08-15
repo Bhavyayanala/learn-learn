@@ -1,4 +1,4 @@
-# LearnNest — Stage 11: Live Classroom + Whiteboard (LiveKit)
+# LearnNest — Stage 12: WhatsApp Fee Reminders
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,
@@ -533,6 +533,75 @@ LIVEKIT_URL=wss://your-project.livekit.cloud
 Restart `npm run dev` after adding these — Next.js only reads
 `.env.local` at server start.
 
+## What's included in Stage 12
+
+- **WhatsApp fee reminders** (section 29) — `lib/notifications/whatsapp.ts`
+  is a gateway-agnostic adapter over Meta's WhatsApp Cloud API, same
+  design as `lib/payments/adapter.ts`. When a teacher generates fee
+  cycles and one becomes genuinely `due`, the app looks up the linked
+  parent's phone number and sends a WhatsApp template message —
+  best-effort: an unconfigured or failed send never blocks fee cycle
+  creation itself, it's just reported back as `skipped`.
+
+### You must get a template approved in Meta before this can send anything
+
+WhatsApp Business requires every message outside a live 24-hour
+customer-service conversation to use a pre-approved **template** — you
+cannot send free-form text. In your Meta Business dashboard, under your
+WhatsApp Business Account → Message Templates, create a template named
+exactly `fee_reminder` (or set `WHATSAPP_FEE_TEMPLATE_NAME` to whatever
+you name it) with this body text, in this category (**Utility**, not
+Marketing — utility templates are far cheaper and don't need marketing
+opt-in):
+
+```
+Hi! This is a reminder that {{1}}'s tuition fee of {{2}} for {{3}} is
+now due. Please log in to LearnNest to complete the payment. Thank you!
+```
+
+The three placeholders arrive in this order: `{{1}}` student name,
+`{{2}}` amount (e.g. `₹1500`), `{{3}}` the billing period (e.g.
+`2026-08`). Submit it for approval — usually minutes to a day. Sending
+will fail with a clear error in the teacher's fee panel if the template
+name doesn't match an approved template, or if it isn't approved yet.
+
+### Environment variables
+
+```
+WHATSAPP_PHONE_NUMBER_ID=your-phone-number-id
+WHATSAPP_ACCESS_TOKEN=your-system-user-access-token
+WHATSAPP_FEE_TEMPLATE_NAME=fee_reminder
+```
+
+Without these set, the adapter safely no-ops (verified: returns
+`{ sent: false, reason: "WhatsApp is not configured..." }` without
+attempting a network call or throwing) — the rest of fee-cycle
+generation is entirely unaffected.
+
+### Privacy note
+
+Phone number lookup uses the admin (service-role) client, not the
+teacher's own session — a teacher has no RLS visibility into the
+`parents` table for privacy reasons, same as the enroll-by-email lookup
+in Stage 4. This is read-only contact info used only to send a
+system-triggered reminder, never exposed back to the teacher.
+
+## Known limitations (Stage 12)
+
+- Only the fee-due reminder is wired up. Section 30's other WhatsApp use
+  cases (class reminders, doubt-answered notifications) would follow the
+  identical `sendWhatsAppTemplate` pattern with a different template.
+- No delivery-status tracking (sent/delivered/read webhooks) — Meta
+  sends these as webhook callbacks, which would need a new API route to
+  receive them.
+- A parent must have a phone number on file. A parent who signed up via
+  email/password (the Stage 6 option added specifically because Twilio's
+  SMS OTP required expensive DLT registration in India) has no phone
+  number recorded, so they're silently skipped rather than reminded —
+  worth adding an optional phone field to the parent profile as a
+  follow-up so email-signup parents can still opt into WhatsApp
+  reminders.
+
 ## Known limitations (Stage 11)
 
 - **No writing-permission flow** — section 13 asks for a request/allow/
@@ -675,26 +744,28 @@ Restart `npm run dev` after adding these — Next.js only reads
 
 ## What's left
 
-Live classroom + whiteboard are now built (Stage 11) — that leaves two
-items genuinely gated on external accounts, not on more building time:
+WhatsApp fee reminders are built (Stage 12), same status as live
+classroom + whiteboard (Stage 11): real code, ready to go, needs your
+actual Meta credentials and an approved template to send anything for
+real. That leaves one item genuinely gated on an external account:
 
 - **Real payments** — the mock adapter is fully wired and tested; a
   Razorpay adapter implementing the same interface is a contained piece
-  of work once you have live keys.
-- **Real WhatsApp/email/SMS notifications** — the notification table and
-  trigger pattern are ready to extend with a delivery channel; sending
-  anything for real needs a Meta Business Account (WhatsApp) or an email/
-  SMS provider.
+  of work whenever you decide to pursue it (explicitly deprioritized per
+  your own call — the mock path is fine to keep using).
 
-Everything else from the original master prompt that's genuinely
-buildable without a third-party account has been built: full auth for
-all three roles, class creation, automatic lesson planning with adaptive
-rescheduling, materials, attendance, assignments, doubts, fee cycles,
-mock payments, notifications, a shared question bank powering tests and
-practice/games, XP, badges with downloadable certificates, a read-only
-admin panel, calendar, search, CI/CD, and now live video + a
-collaborative whiteboard. Every migration was executed against a real
-running Postgres database as part of building it — that discipline
-caught and fixed several real bugs along the way (an RLS policy cycle,
-two payment-forgery holes, a grade-tampering hole) that all looked
-completely correct on inspection and only surfaced once actually run.
+Everything else from the original master prompt that's buildable without
+a third-party account has been built: full auth for all three roles,
+class creation, automatic lesson planning with adaptive rescheduling,
+materials, attendance, assignments, doubts, fee cycles, mock payments,
+in-app notifications, WhatsApp fee reminders, a shared question bank
+powering tests and practice/games, XP, badges with downloadable
+certificates, a read-only admin panel, calendar, search, CI/CD, live
+video + a collaborative whiteboard, and a real design system with a
+working sign-out (which didn't exist before this pass). Every migration
+was executed against a real running Postgres database as part of
+building it — that discipline caught and fixed several real bugs along
+the way (an RLS policy cycle, two payment-forgery holes, a grade-
+tampering hole, and a couple of UI bugs caught while polishing the
+classroom) that all looked completely correct on inspection and only
+surfaced once actually run.

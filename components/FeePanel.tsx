@@ -55,8 +55,10 @@ export function FeePanel({
     }
 
     const body = await res.json();
+    const wa = body.whatsappReminders;
     setInfo(
-      `${body.cyclesCreated} fee cycle(s) for ${body.period} · ${body.classesCompleted} classes completed · status: ${body.status}`
+      `${body.cyclesCreated} fee cycle(s) for ${body.period} · ${body.classesCompleted} classes completed · status: ${body.status}` +
+        (wa ? ` · WhatsApp reminders sent: ${wa.sent}, skipped: ${wa.skipped}` : "")
     );
     router.refresh();
   }

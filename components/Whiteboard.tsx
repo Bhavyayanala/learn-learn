@@ -126,16 +126,39 @@ export function Whiteboard({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const parent = canvas?.parentElement;
+    if (!canvas || !parent) return;
+
+    let lastW = 0;
+    let lastH = 0;
+
     const resize = () => {
-      const parent = canvas.parentElement;
-      if (!parent) return;
-      canvas.width = parent.clientWidth;
-      canvas.height = parent.clientHeight;
+      // Guard against sizing to 0×0 while this panel is hidden behind
+      // the Video tab (display:none gives clientWidth/clientHeight of
+      // 0) — only resize when there's real space, otherwise keep
+      // whatever size we last had rather than collapsing the canvas.
+      const w = parent.clientWidth;
+      const h = parent.clientHeight;
+      if (w === 0 || h === 0) return;
+      // Setting canvas.width/height clears the drawing surface, so only
+      // actually do it when the size genuinely changed — the observer
+      // can fire for reasons that don't change the real dimensions.
+      if (w === lastW && h === lastH) return;
+      lastW = w;
+      lastH = h;
+      canvas.width = w;
+      canvas.height = h;
     };
+
+    // ResizeObserver (not a window "resize" listener) is what actually
+    // catches the moment a display:none panel becomes visible again —
+    // switching tabs doesn't fire a window resize event, but it does
+    // change this element's observed size.
+    const observer = new ResizeObserver(resize);
+    observer.observe(parent);
     resize();
-    window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
+
+    return () => observer.disconnect();
   }, []);
 
   return (

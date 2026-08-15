@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { sendFeeReminderWhatsApp } from "@/lib/notifications/whatsapp";
+import { sendFeeReminderEmail } from "@/lib/notifications/email";
 
 // Creates (or refreshes) this month's fee cycle for every student
 // enrolled in a class. Master prompt sections 26-27: once the planned
@@ -131,7 +132,7 @@ export async function POST(
 
     const { data: parentLinks } = await admin
       .from("parent_students")
-      .select("student_id, parents(users(phone))")
+      .select("student_id, parents(users(phone, email))")
       .in("student_id", dueStudentIds);
 
     const nameByStudent = new Map(
@@ -145,24 +146,39 @@ export async function POST(
       const parent = Array.isArray(link.parents) ? link.parents[0] : link.parents;
       const u = parent ? (parent as { users: unknown }).users : null;
       const uu = Array.isArray(u) ? u[0] : u;
-      const phone = (uu as { phone?: string } | null)?.phone;
-
-      if (!phone) {
-        remindersSkipped++;
-        continue;
-      }
+      const phone = (uu as { phone?: string; email?: string } | null)?.phone;
+      const email = (uu as { phone?: string; email?: string } | null)?.email;
 
       const row = dueRows.find((r) => r.student_id === link.student_id);
       if (!row) continue;
 
-      const result = await sendFeeReminderWhatsApp({
-        parentPhone: phone,
-        studentName: nameByStudent.get(link.student_id) ?? "Student",
-        amount: row.amount,
-        periodLabel: row.period_label,
-      });
+      // Send on whichever channel this parent actually has — phone/OTP
+      // signups have no email, email signups have no phone (see the
+      // design note in lib/notifications/email.ts). Trying both when
+      // both exist maximizes real reach rather than picking one.
+      let anySent = false;
 
-      if (result.sent) remindersSent++;
+      if (email) {
+        const result = await sendFeeReminderEmail({
+          parentEmail: email,
+          studentName: nameByStudent.get(link.student_id) ?? "Student",
+          amount: row.amount,
+          periodLabel: row.period_label,
+        });
+        if (result.sent) anySent = true;
+      }
+
+      if (phone) {
+        const result = await sendFeeReminderWhatsApp({
+          parentPhone: phone,
+          studentName: nameByStudent.get(link.student_id) ?? "Student",
+          amount: row.amount,
+          periodLabel: row.period_label,
+        });
+        if (result.sent) anySent = true;
+      }
+
+      if (anySent) remindersSent++;
       else remindersSkipped++;
     }
   }
@@ -172,6 +188,6 @@ export async function POST(
     cyclesCreated: toUpsert.length,
     classesCompleted: completed,
     status,
-    whatsappReminders: { sent: remindersSent, skipped: remindersSkipped },
+    reminders: { sent: remindersSent, skipped: remindersSkipped },
   });
 }

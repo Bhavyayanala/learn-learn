@@ -1,4 +1,4 @@
-# LearnNest — Stage 12: WhatsApp Fee Reminders
+# LearnNest — Stage 13: Email Fee Reminders (Resend)
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,
@@ -586,6 +586,53 @@ teacher's own session — a teacher has no RLS visibility into the
 in Stage 4. This is read-only contact info used only to send a
 system-triggered reminder, never exposed back to the teacher.
 
+## What's included in Stage 13
+
+- **Email fee reminders** via Resend — `lib/notifications/email.ts`,
+  same gateway-agnostic shape as the payment and WhatsApp adapters.
+  Added as a second reminder channel because WhatsApp's Cloud API
+  requires a billing method attached to the Meta Business Account before
+  it will send anything at all, even within the free allowance — a real
+  barrier not worth pushing through right now. Resend needs only an API
+  key: no business verification, 3,000 free emails/month.
+- The fee-cycle route now sends on **whichever channel each parent
+  actually has** — email if they signed up via email, WhatsApp (once
+  configured) if they signed up via phone/OTP, both if somehow both
+  exist. This isn't a preference toggle; it reflects a real, structural
+  gap worth understanding:
+
+  **Phone-OTP parent signup never asks for an email. Email-signup parent
+  signup never asks for a phone number.** So today, every parent can
+  only ever receive reminders through the one channel that matches
+  however they originally signed up. The real fix is adding an optional
+  second contact field to the parent profile regardless of signup
+  method — flagged as a follow-up, not fixed in this stage.
+
+### Environment variables
+
+```
+RESEND_API_KEY=your-api-key
+EMAIL_FROM_ADDRESS=LearnNest <onboarding@resend.dev>
+```
+
+Get a free API key at resend.com — no domain verification needed to
+start (their `onboarding@resend.dev` sender works immediately for
+testing); verify your own domain later so mail shows LearnNest as the
+sender and lands reliably instead of in spam.
+
+Without `RESEND_API_KEY` set, the adapter safely no-ops — verified:
+returns `{ sent: false, reason: "Email is not configured..." }` with no
+network call and no throw, so fee cycle creation is unaffected either
+way, same as the WhatsApp adapter's unconfigured behavior.
+
+## Known limitations (Stage 13)
+
+- See the structural signup-collects-only-one-contact-method gap
+  described above — this is the main limitation worth fixing next.
+- No delivery/open tracking — Resend supports webhooks for this, not
+  wired up.
+- Plain HTML template, not a branded design system email.
+
 ## Known limitations (Stage 12)
 
 - Only the fee-due reminder is wired up. Section 30's other WhatsApp use
@@ -744,28 +791,26 @@ system-triggered reminder, never exposed back to the teacher.
 
 ## What's left
 
-WhatsApp fee reminders are built (Stage 12), same status as live
-classroom + whiteboard (Stage 11): real code, ready to go, needs your
-actual Meta credentials and an approved template to send anything for
-real. That leaves one item genuinely gated on an external account:
+Email fee reminders (Stage 13) join WhatsApp (Stage 12) and live
+classroom + whiteboard (Stage 11) as real, built, ready-to-go features
+waiting only on your credentials to actually send/connect for real. That
+leaves one item genuinely deprioritized by your own call rather than
+blocked:
 
 - **Real payments** — the mock adapter is fully wired and tested; a
-  Razorpay adapter implementing the same interface is a contained piece
-  of work whenever you decide to pursue it (explicitly deprioritized per
-  your own call — the mock path is fine to keep using).
+  Razorpay adapter is a contained follow-up whenever you want it.
 
-Everything else from the original master prompt that's buildable without
-a third-party account has been built: full auth for all three roles,
-class creation, automatic lesson planning with adaptive rescheduling,
-materials, attendance, assignments, doubts, fee cycles, mock payments,
-in-app notifications, WhatsApp fee reminders, a shared question bank
-powering tests and practice/games, XP, badges with downloadable
-certificates, a read-only admin panel, calendar, search, CI/CD, live
-video + a collaborative whiteboard, and a real design system with a
-working sign-out (which didn't exist before this pass). Every migration
-was executed against a real running Postgres database as part of
-building it — that discipline caught and fixed several real bugs along
-the way (an RLS policy cycle, two payment-forgery holes, a grade-
-tampering hole, and a couple of UI bugs caught while polishing the
-classroom) that all looked completely correct on inspection and only
-surfaced once actually run.
+Everything else from the original master prompt that's buildable
+without a third-party account has been built: full auth for all three
+roles, class creation, automatic lesson planning with adaptive
+rescheduling, materials, attendance, assignments, doubts, fee cycles,
+mock payments, in-app notifications, WhatsApp + email fee reminders, a
+shared question bank powering tests and practice/games, XP, badges with
+downloadable certificates, a read-only admin panel, calendar, search,
+CI/CD, live video + a collaborative whiteboard, and a real design system
+with a working sign-out. Every migration was executed against a real
+running Postgres database as part of building it — that discipline
+caught and fixed several real bugs along the way (an RLS policy cycle,
+two payment-forgery holes, a grade-tampering hole, and a couple of UI
+bugs caught while polishing the classroom) that all looked completely
+correct on inspection and only surfaced once actually run.

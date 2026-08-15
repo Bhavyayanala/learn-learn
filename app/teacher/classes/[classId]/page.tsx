@@ -172,11 +172,20 @@ export default async function ClassDetailPage({
         ← All classes
       </Link>
 
-      <div className="mt-3">
-        <p className="text-sm font-medium text-teacher">
-          {klass.grade} · {subjectName ?? "Subject"}
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold">Class Overview</h1>
+      <div className="mt-3 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-teacher">
+            {klass.grade} · {subjectName ?? "Subject"}
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold">Class Overview</h1>
+        </div>
+        <Link
+          href={`/classroom/${klass.id}`}
+          className="shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
+        >
+          🎥 Start Live Class
+        </Link>
+      </div>
         <p className="mt-2 text-sm text-slate-500">
           {klass.classes_per_month} classes/month · {klass.duration_minutes} min
           each
@@ -186,7 +195,6 @@ export default async function ClassDetailPage({
             ? ` · ${klass.days_of_week.join(", ")}`
             : ""}
         </p>
-      </div>
 
       <section className="mt-8 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
         <h2 className="font-semibold">Teaching Materials</h2>

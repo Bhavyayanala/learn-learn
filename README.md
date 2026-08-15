@@ -1,4 +1,4 @@
-# LearnNest — Stage 10: Admin Panel + Certificates + CI/CD
+# LearnNest — Stage 11: Live Classroom + Whiteboard (LiveKit)
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,
@@ -488,6 +488,74 @@ regular teacher's own view of `users` still returns exactly one row
 (themselves) — the new admin policy doesn't leak visibility to anyone
 who isn't actually role='admin'.
 
+## What's included in Stage 11
+
+- **Live classroom** (section 14) — real video/audio using LiveKit,
+  via the `VideoConference` prefab (camera, mic, screen share, chat, grid
+  layout all included). One persistent room per class, not per session.
+- **Collaborative whiteboard** (section 13) — draw, erase, change pen
+  color/size, clear — synced in real time over LiveKit's existing data
+  channel rather than a separate service. Every stroke segment
+  broadcasts immediately; there's no central canvas state to reconcile.
+- Both are gated by `/api/classes/[classId]/live/token`, which reuses
+  the exact same RLS-backed authorization pattern as the rest of this
+  app: a successful `SELECT` against `classes` proves teacher ownership,
+  a successful `SELECT` against `class_students` proves enrollment.
+  There's no separate, hand-written permission check that could drift
+  out of sync with everything else already tested in this repo.
+
+### What was actually verified, and what wasn't
+
+This sandbox has no network path to `livekit.cloud` and no second
+browser to test a real multi-peer call — the honest limitation flagged
+back when this stage was first discussed. What genuinely was tested:
+a real JWT was signed with your actual LiveKit API key/secret via
+`AccessToken`, then independently re-verified with `TokenVerifier` using
+the same credentials — confirming the key/secret are valid and the room
+name, identity, and grant claims (including the teacher's `roomAdmin`)
+come out correct. `npm run build` compiles the whole app, including the
+`/classroom/[classId]` route, cleanly. What's *not* verified is the live
+connection itself — that WebRTC actually negotiates, that two real
+browsers actually see each other's video, that the whiteboard sync is
+smooth in practice. That needs to be tried from your end.
+
+### Environment variables
+
+Add to `.env.local` (already present as commented placeholders in
+`.env.example` — this stage just fills them in):
+
+```
+LIVEKIT_API_KEY=your-key
+LIVEKIT_API_SECRET=your-secret
+LIVEKIT_URL=wss://your-project.livekit.cloud
+```
+
+Restart `npm run dev` after adding these — Next.js only reads
+`.env.local` at server start.
+
+## Known limitations (Stage 11)
+
+- **No writing-permission flow** — section 13 asks for a request/allow/
+  deny flow before a student can draw. Everyone in the room can draw on
+  the whiteboard right now; the moderation flow is a reasonable next
+  addition, and the teacher's `roomAdmin` grant is already in place to
+  support it.
+- **No board persistence** — a late joiner doesn't see strokes drawn
+  before they connected, and nothing is saved when the class ends
+  (sections 13's "save board state," "download as PDF/image" aren't
+  built). The current design intentionally has no central canvas state
+  to keep sync simple; persistence would mean periodically snapshotting
+  the canvas to Storage.
+- **No automatic attendance from joining** — the live room isn't tied to
+  a `class_sessions` row, so attendance stays the existing manual flow.
+  Wiring "joined the LiveKit room" to auto-create an attendance record is
+  a contained follow-up.
+- **No recording** (part of section 14) — would need LiveKit's egress
+  API, not yet integrated.
+- **One room per class, not per scheduled session** — simpler for this
+  stage; means the room is always "open" rather than tied to a specific
+  day's lesson plan item.
+
 ## Known limitations (Stage 10)
 
 - Admin is read-only. Editing/deleting any user's data, managing
@@ -607,35 +675,26 @@ who isn't actually role='admin'.
 
 ## What's left
 
-This is now the practical stopping point for what can be built and
-verified without external accounts. Built and tested against a real
-running Postgres database at every stage: full auth for all three
-roles, class creation, materials, automatic lesson planning, adaptive
-rescheduling, attendance, assignments, doubts, fee cycles + mock
-payments, notifications, a shared question bank powering both tests and
-practice/games, XP, badges with downloadable certificates, a teacher
-calendar, search, a read-only admin panel, and CI/CD. Every migration
-in this repo was executed against a live database as part of building
-it, not just read for correctness — that discipline caught and fixed
-several real bugs along the way that looked completely fine on
-inspection: an RLS policy cycle, two separate payment-forgery holes, and
-a grade-tampering hole.
+Live classroom + whiteboard are now built (Stage 11) — that leaves two
+items genuinely gated on external accounts, not on more building time:
 
-What remains is genuinely gated on external setup, not on more time:
+- **Real payments** — the mock adapter is fully wired and tested; a
+  Razorpay adapter implementing the same interface is a contained piece
+  of work once you have live keys.
+- **Real WhatsApp/email/SMS notifications** — the notification table and
+  trigger pattern are ready to extend with a delivery channel; sending
+  anything for real needs a Meta Business Account (WhatsApp) or an email/
+  SMS provider.
 
-- **Live classroom + collaborative whiteboard** — need LiveKit (or
-  equivalent) credentials and real-time infrastructure this sandbox
-  can't exercise: no second browser, no WebRTC peer to test against.
-- **Real payments** — the mock adapter is fully wired, tested, and
-  swappable; a Razorpay adapter implementing the same interface is a
-  contained follow-up once you have live keys.
-- **Real email/SMS/WhatsApp** — the notification system's trigger
-  pattern is ready to extend with a `channel` column; sending anything
-  for real needs provider accounts (see the earlier Twilio discussion
-  for what that actually involves, including DLT registration for
-  India).
-
-Building any of those three blind — the way the RLS recursion bug
-nearly shipped in Stage 1 — would be a worse outcome than waiting for
-credentials. When you're ready to set any of them up, that's a
-well-scoped, focused piece of work at that point, not a guess.
+Everything else from the original master prompt that's genuinely
+buildable without a third-party account has been built: full auth for
+all three roles, class creation, automatic lesson planning with adaptive
+rescheduling, materials, attendance, assignments, doubts, fee cycles,
+mock payments, notifications, a shared question bank powering tests and
+practice/games, XP, badges with downloadable certificates, a read-only
+admin panel, calendar, search, CI/CD, and now live video + a
+collaborative whiteboard. Every migration was executed against a real
+running Postgres database as part of building it — that discipline
+caught and fixed several real bugs along the way (an RLS policy cycle,
+two payment-forgery holes, a grade-tampering hole) that all looked
+completely correct on inspection and only surfaced once actually run.

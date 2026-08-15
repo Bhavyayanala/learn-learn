@@ -41,7 +41,8 @@ export async function middleware(request: NextRequest) {
   // enforces "must be logged in" for /admin; the actual role check
   // happens in the admin page itself against a live database read.
   const isAdminPath = path.startsWith("/admin");
-  const isProtected = isRolePrefixed || isAdminPath;
+  const isClassroomPath = path.startsWith("/classroom");
+  const isProtected = isRolePrefixed || isAdminPath || isClassroomPath;
 
   if (isProtected && !user) {
     const url = request.nextUrl.clone();
@@ -63,5 +64,11 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/teacher/:path*", "/student/:path*", "/parent/:path*", "/admin/:path*"],
+  matcher: [
+    "/teacher/:path*",
+    "/student/:path*",
+    "/parent/:path*",
+    "/admin/:path*",
+    "/classroom/:path*",
+  ],
 };

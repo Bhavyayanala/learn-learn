@@ -193,6 +193,17 @@ export default async function StudentDashboard() {
             </div>
           </div>
 
+          {classes.length > 0 && (
+            <div className="mt-3">
+              <Link
+                href={`/classroom/${classes[0].id}`}
+                className="block rounded-2xl border-2 border-emerald-500 bg-emerald-50 p-4 text-center font-bold text-emerald-700"
+              >
+                🎥 Join Live Class
+              </Link>
+            </div>
+          )}
+
           {availableTests && availableTests.length > 0 && (
             <section className="mt-6">
               <h2 className="text-lg font-bold">📝 Tests</h2>

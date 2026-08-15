@@ -251,7 +251,7 @@ export default async function StudentDashboard() {
           <section className="mt-6">
             <h2 className="text-lg font-bold">🏆 My Badges</h2>
             <div className="mt-3">
-              <BadgeShelf badges={badges} />
+              <BadgeShelf badges={badges} studentName={user.user_metadata?.full_name ?? "Student"} />
             </div>
           </section>
 

@@ -1,4 +1,4 @@
-# LearnNest — Stage 9: Badges + Calendar + Search
+# LearnNest — Stage 10: Admin Panel + Certificates + CI/CD
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,
@@ -440,6 +440,64 @@ session correctly auto-awards the badge in the same transaction, a
 student sees only their own badges, and the forgery attempt above is
 blocked.
 
+## What's included in Stage 10
+
+- **Admin panel** (section 35) — a read-only oversight dashboard: total
+  teachers/students/parents/classes and payments collected, plus a
+  recent-classes list. Deliberately read-only: full CRUD across every
+  user's data is a materially bigger and higher-risk surface than an
+  oversight view, and per section 35 admin functionality must stay fully
+  separate from teacher/student/parent access anyway, so this is a
+  contained addition rather than something to rush. There's no signup
+  path to become an admin (see below for the one-time promotion step).
+- **Downloadable certificates** (section 34) — each earned badge gets a
+  "Download" link that generates a real PDF client-side with `jspdf`,
+  styled as a certificate with the student's name, the badge, and the
+  date. No server round-trip.
+- **CI/CD** (section 64) — a GitHub Actions workflow that runs `npm ci`
+  and `npm run build` (which includes Next.js's own type-checking and
+  linting) on every push and PR to `main`.
+
+### Becoming an admin
+
+There's intentionally no UI for this. After migration 0013, run once in
+Supabase SQL Editor:
+
+```sql
+update public.users set role = 'admin' where email = 'your-email@example.com';
+```
+
+Then log in normally (through the existing teacher/student login form —
+an admin account still needs a real `auth.users` row, so sign up first
+as any role, then run the update above) and visit `/admin/dashboard`
+directly. One subtlety: the login middleware reads your role from the
+session's JWT metadata, which was set at signup and won't say 'admin'
+after this manual promotion — that's fine, `/admin` routes only check
+that you're logged in via the JWT, then verify the real role with a live
+database read on the admin page itself, which reflects the change
+immediately.
+
+### Security
+
+`is_admin()` appears **only** in SELECT policies — nowhere does it grant
+INSERT/UPDATE/DELETE. Verified against real Postgres: an admin's attempt
+to UPDATE a class or DELETE a student both silently affect zero rows
+(RLS filters them out before the write can happen), while SELECT
+correctly returns every row across every teacher. Also verified: a
+regular teacher's own view of `users` still returns exactly one row
+(themselves) — the new admin policy doesn't leak visibility to anyone
+who isn't actually role='admin'.
+
+## Known limitations (Stage 10)
+
+- Admin is read-only. Editing/deleting any user's data, managing
+  subjects globally, or platform settings aren't built — see the scope
+  note above.
+- No dedicated admin login flow or UI to promote other admins; it's a
+  single manual SQL statement per new admin.
+- The certificate PDF is intentionally simple (text + a border) rather
+  than a designed template with a logo/signature graphic.
+
 ## Known limitations (Stage 9)
 
 - No certificate *files* — section 34 also asks for a downloadable
@@ -549,35 +607,35 @@ blocked.
 
 ## What's left
 
-Everything buildable and verifiable without external accounts has been
-built: full auth for all three roles, class creation, materials,
-automatic lesson planning, adaptive rescheduling, attendance,
-assignments, doubts, fee cycles + mock payments, notifications, a
-question bank powering both tests and practice/games, XP, badges, a
-teacher calendar, and search. Every migration in this repo was verified
-against a real local Postgres instance, not just read for correctness —
-that process caught and fixed real bugs, including two payment-forgery
-holes and a grade-tampering hole that looked completely fine on
-inspection and only surfaced once actually executed.
+This is now the practical stopping point for what can be built and
+verified without external accounts. Built and tested against a real
+running Postgres database at every stage: full auth for all three
+roles, class creation, materials, automatic lesson planning, adaptive
+rescheduling, attendance, assignments, doubts, fee cycles + mock
+payments, notifications, a shared question bank powering both tests and
+practice/games, XP, badges with downloadable certificates, a teacher
+calendar, search, a read-only admin panel, and CI/CD. Every migration
+in this repo was executed against a live database as part of building
+it, not just read for correctness — that discipline caught and fixed
+several real bugs along the way that looked completely fine on
+inspection: an RLS policy cycle, two separate payment-forgery holes, and
+a grade-tampering hole.
 
-What's left is genuinely blocked on external setup, not on more time:
+What remains is genuinely gated on external setup, not on more time:
 
 - **Live classroom + collaborative whiteboard** — need LiveKit (or
   equivalent) credentials and real-time infrastructure this sandbox
-  can't exercise (no second browser, no WebRTC peer to test against).
-- **Real payments** — the mock adapter is fully wired and tested; a
-  Razorpay adapter implementing the same interface is a contained piece
-  of work once you have live keys.
-- **Real email/SMS/WhatsApp** — the notification table and trigger
-  pattern are ready for a `channel` column; sending anything for real
-  needs provider accounts (see the Twilio discussion earlier for what
-  that involves, including DLT registration for India).
-- **Certificates as downloadable files**, a full admin panel, and CI/CD
-  are the remaining named sections from the original spec not covered
-  above — smaller, lower-stakes items than what's built so far.
+  can't exercise: no second browser, no WebRTC peer to test against.
+- **Real payments** — the mock adapter is fully wired, tested, and
+  swappable; a Razorpay adapter implementing the same interface is a
+  contained follow-up once you have live keys.
+- **Real email/SMS/WhatsApp** — the notification system's trigger
+  pattern is ready to extend with a `channel` column; sending anything
+  for real needs provider accounts (see the earlier Twilio discussion
+  for what that actually involves, including DLT registration for
+  India).
 
-Building any of the first three blind — the way the RLS recursion bug
+Building any of those three blind — the way the RLS recursion bug
 nearly shipped in Stage 1 — would be a worse outcome than waiting for
-credentials. When you're ready to set any of them up, come back and
-we'll build that piece the same way as everything else: real code,
-verified against something real, not just written and hoped for.
+credentials. When you're ready to set any of them up, that's a
+well-scoped, focused piece of work at that point, not a guess.

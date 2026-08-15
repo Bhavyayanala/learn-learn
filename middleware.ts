@@ -33,9 +33,15 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isProtected = Object.values(ROLE_PREFIX).some((p) =>
-    path.startsWith(p)
-  );
+  const isRolePrefixed = Object.values(ROLE_PREFIX).some((p) => path.startsWith(p));
+  // /admin is handled separately from the role-prefix map below: an
+  // admin account is promoted by directly editing public.users.role
+  // (see migration 0013), not through signup, so the JWT's
+  // user_metadata.role can be stale for an admin. Middleware here only
+  // enforces "must be logged in" for /admin; the actual role check
+  // happens in the admin page itself against a live database read.
+  const isAdminPath = path.startsWith("/admin");
+  const isProtected = isRolePrefixed || isAdminPath;
 
   if (isProtected && !user) {
     const url = request.nextUrl.clone();
@@ -43,7 +49,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (isProtected && user) {
+  if (isRolePrefixed && user) {
     const role = (user.user_metadata as { role?: string })?.role;
     const allowedPrefix = role ? ROLE_PREFIX[role] : undefined;
     if (!allowedPrefix || !path.startsWith(allowedPrefix)) {
@@ -57,5 +63,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/teacher/:path*", "/student/:path*", "/parent/:path*"],
+  matcher: ["/teacher/:path*", "/student/:path*", "/parent/:path*", "/admin/:path*"],
 };

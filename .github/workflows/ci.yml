@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check + build
+        # `next build` runs TypeScript checking and ESLint as part of the
+        # production build, so a broken type or a real lint error fails
+        # this step — see the many "npm run build" checks throughout this
+        # repo's commit history, this workflow just automates that same
+        # check on every push instead of relying on it being run by hand.
+        run: npm run build
+        env:
+          # Build-time only placeholders — the build needs these env vars
+          # to exist, but doesn't need them to be real Supabase keys since
+          # no live network call happens during `next build`. Real values
+          # are supplied at deploy time via the hosting platform's env
+          # var settings, never committed here.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key-for-ci-build
+          SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key-for-ci-build

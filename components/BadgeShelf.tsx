@@ -1,3 +1,7 @@
+"use client";
+
+import { DownloadCertificateButton } from "@/components/DownloadCertificateButton";
+
 type Badge = {
   code: string;
   title: string;
@@ -6,7 +10,13 @@ type Badge = {
   earned_at: string;
 };
 
-export function BadgeShelf({ badges }: { badges: Badge[] }) {
+export function BadgeShelf({
+  badges,
+  studentName,
+}: {
+  badges: Badge[];
+  studentName: string;
+}) {
   if (badges.length === 0) {
     return (
       <p className="rounded-xl bg-white p-4 text-center text-sm text-slate-500">
@@ -25,6 +35,12 @@ export function BadgeShelf({ badges }: { badges: Badge[] }) {
         >
           <p className="text-3xl">{b.emoji}</p>
           <p className="mt-1 text-xs font-bold">{b.title}</p>
+          <DownloadCertificateButton
+            studentName={studentName}
+            badgeTitle={b.title}
+            badgeDescription={b.description}
+            earnedAt={b.earned_at}
+          />
         </div>
       ))}
     </div>

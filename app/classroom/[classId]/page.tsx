@@ -23,9 +23,7 @@ export default async function ClassroomPage({
     .from("classes")
     .select("id, grade, subjects(name)")
     .eq("id", params.classId)
-    .maybeSingle();
-
-  let isTeacher = false;
+    .maybeSingle();  let isTeacher = false;
   let authorized = false;
 
   if (klass) {
@@ -65,13 +63,25 @@ export default async function ClassroomPage({
     ? `/teacher/classes/${params.classId}`
     : "/student/dashboard";
 
+  const subjectName = klass
+    ? Array.isArray(klass.subjects)
+      ? (klass.subjects[0] as { name: string } | undefined)?.name
+      : (klass.subjects as unknown as { name: string } | null)?.name
+    : undefined;
+  const classLabel = klass ? `${klass.grade} · ${subjectName ?? "Class"}` : "Live Class";
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-6">
       <Link href={backHref} className="text-sm text-slate-500 underline">
         ← Back
       </Link>
       <div className="mt-3">
-        <LiveClassroom token={token} serverUrl={livekitUrl} isTeacher={isTeacher} />
+        <LiveClassroom
+          token={token}
+          serverUrl={livekitUrl}
+          isTeacher={isTeacher}
+          className={classLabel}
+        />
       </div>
     </main>
   );

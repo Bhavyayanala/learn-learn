@@ -29,7 +29,13 @@ type StrokeMsg = {
 
 const COLORS = ["#1e293b", "#dc2626", "#2563eb", "#16a34a", "#f59e0b"];
 
-export function Whiteboard({ canDraw = true }: { canDraw?: boolean }) {
+export function Whiteboard({
+  canDraw = true,
+  accentColor = "#2563eb",
+}: {
+  canDraw?: boolean;
+  accentColor?: string;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -133,43 +139,77 @@ export function Whiteboard({ canDraw = true }: { canDraw?: boolean }) {
   }, []);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-slate-50">
       {canDraw && (
-        <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-3 py-2">
-          {COLORS.map((c) => (
-            <button
-              key={c}
-              onClick={() => setColor(c)}
-              className={`h-6 w-6 rounded-full border-2 ${color === c ? "border-slate-900" : "border-transparent"}`}
-              style={{ backgroundColor: c }}
-              aria-label={`Pen color ${c}`}
+        <div className="flex flex-wrap items-center gap-4 border-b border-slate-200 bg-white px-4 py-2.5 shadow-sm">
+          <div className="flex items-center gap-1.5">
+            {COLORS.map((c) => (
+              <button
+                key={c}
+                onClick={() => setColor(c)}
+                className="grid h-7 w-7 place-items-center rounded-full transition-transform hover:scale-110"
+                style={{
+                  backgroundColor: c,
+                  boxShadow: color === c ? `0 0 0 2px white, 0 0 0 4px ${c}` : "none",
+                }}
+                aria-label={`Pen color ${c}`}
+              >
+                {color === c && <span className="h-2 w-2 rounded-full bg-white" />}
+              </button>
+            ))}
+          </div>
+
+          <div className="h-6 w-px bg-slate-200" />
+
+          <div className="flex items-center gap-2">
+            <span
+              className="rounded-full"
+              style={{
+                width: Math.max(size, 4),
+                height: Math.max(size, 4),
+                backgroundColor: color,
+              }}
             />
-          ))}
-          <input
-            type="range"
-            min={1}
-            max={12}
-            value={size}
-            onChange={(e) => setSize(Number(e.target.value))}
-            className="w-24"
-          />
+            <input
+              type="range"
+              min={1}
+              max={16}
+              value={size}
+              onChange={(e) => setSize(Number(e.target.value))}
+              className="w-20 accent-slate-700"
+            />
+          </div>
+
           <button
             onClick={clearBoard}
-            className="ml-auto rounded-lg border border-slate-300 px-3 py-1 text-xs"
+            className="ml-auto flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 hover:border-red-300 hover:text-red-600"
           >
-            Clear
+            🗑️ Clear board
           </button>
         </div>
       )}
-      <div className="relative flex-1 bg-white">
+      <div className="relative flex-1">
         <canvas
           ref={canvasRef}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
-          className={`h-full w-full touch-none ${canDraw ? "cursor-crosshair" : "cursor-default"}`}
+          className={`h-full w-full touch-none bg-white ${canDraw ? "cursor-crosshair" : "cursor-default"}`}
+          style={{
+            backgroundImage:
+              "linear-gradient(#f1f5f9 1px, transparent 1px), linear-gradient(90deg, #f1f5f9 1px, transparent 1px)",
+            backgroundSize: "24px 24px",
+          }}
         />
+        {!canDraw && (
+          <div
+            className="pointer-events-none absolute left-3 top-3 rounded-lg px-3 py-1.5 text-xs font-medium text-white"
+            style={{ backgroundColor: accentColor }}
+          >
+            Watching only
+          </div>
+        )}
       </div>
     </div>
   );

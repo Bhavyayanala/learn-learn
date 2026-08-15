@@ -4,6 +4,7 @@ import { StudentHomework } from "@/components/StudentHomework";
 import { AskTeacher } from "@/components/AskTeacher";
 import Link from "next/link";
 import { BadgeShelf } from "@/components/BadgeShelf";
+import { ScrollToHash } from "@/components/ScrollToHash";
 
 export default async function StudentDashboard() {
   const supabase = createClient();
@@ -132,6 +133,7 @@ export default async function StudentDashboard() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
+      <ScrollToHash />
       <div className="rounded-2xl border-2 border-student-light bg-white p-6 text-center shadow-sm">
         <p className="text-lg font-medium text-student">
           Hi {user.user_metadata?.full_name ?? "there"}! 👋
@@ -201,7 +203,7 @@ export default async function StudentDashboard() {
           )}
 
           {availableTests && availableTests.length > 0 && (
-            <section className="mt-6">
+            <section id="voice-tests-section" className="mt-6 scroll-mt-20">
               <h2 className="text-lg font-bold">📝 Tests</h2>
               <ul className="mt-3 space-y-2">
                 {availableTests.map((t) => (
@@ -228,7 +230,7 @@ export default async function StudentDashboard() {
             </section>
           )}
 
-          <section className="mt-6">
+          <section id="voice-homework-section" className="mt-6 scroll-mt-20">
             <h2 className="text-lg font-bold">✏️ My Homework</h2>
             <div className="mt-3">
               <StudentHomework
@@ -240,7 +242,7 @@ export default async function StudentDashboard() {
           </section>
 
           {materials && materials.length > 0 && (
-            <section className="mt-6">
+            <section id="voice-materials-section" className="mt-6 scroll-mt-20">
               <h2 className="text-lg font-bold">📚 Study Materials</h2>
               <ul className="mt-3 space-y-2">
                 {materials.map((m) => (
@@ -255,7 +257,7 @@ export default async function StudentDashboard() {
             </section>
           )}
 
-          <section className="mt-6">
+          <section id="voice-progress-section" className="mt-6 scroll-mt-20">
             <h2 className="text-lg font-bold">🏆 My Badges</h2>
             <div className="mt-3">
               <BadgeShelf badges={badges} studentName={user.user_metadata?.full_name ?? "Student"} />

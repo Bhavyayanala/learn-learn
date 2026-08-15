@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/AppShell";
+import { VoiceControl } from "@/components/VoiceControl";
 
 export default async function StudentLayout({
   children,
@@ -16,6 +17,7 @@ export default async function StudentLayout({
   return (
     <AppShell role="student" userName={user.user_metadata?.full_name ?? "Student"}>
       {children}
+      <VoiceControl />
     </AppShell>
   );
 }

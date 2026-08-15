@@ -1,4 +1,4 @@
-# LearnNest — Stage 13: Email Fee Reminders (Resend)
+# LearnNest — Stage 14: Voice-Controlled Navigation
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,
@@ -625,6 +625,88 @@ returns `{ sent: false, reason: "Email is not configured..." }` with no
 network call and no throw, so fee cycle creation is unaffected either
 way, same as the WhatsApp adapter's unconfigured behavior.
 
+## What's included in Stage 14
+
+A real voice-controlled UI for students, not a chatbot — "say it, the
+website understands it, the website does it." Architecture matches the
+spec's own suggested shape:
+
+```
+lib/voice/
+  types.ts            intent/state types
+  speechRecognition.ts browser SpeechRecognition wrapper (single-shot,
+                        NOT continuous — mic activates once per tap)
+  speechSynthesis.ts   short spoken confirmations only
+  intentParser.ts      lightweight keyword/regex NLU, no LLM
+  commandRouter.ts     pure entity-resolution logic (which class/test
+                        matches what was said)
+components/
+  VoiceControl.tsx     the mic button + state machine + orchestration
+  ScrollToHash.tsx      tiny helper so voice-navigating to a dashboard
+                        section scrolls there even from another page
+```
+
+**Intents wired up:** go home, go back, help, logout (with spoken
+confirmation), open practice, open tests/homework/materials/progress
+(scrolls to that dashboard section), join a class by subject, start a
+test by subject — including the multi-match clarification flow ("I
+found Mathematics and Science — which one?") when more than one
+matches, exactly as demonstrated in the spec.
+
+**Why keyword/regex, not an LLM:** no LLM is currently wired into this
+app (`ANTHROPIC_API_KEY` is an unset placeholder in `.env.example`), and
+the spec explicitly calls for "a lightweight intent/keyword system
+first, structured so an LLM can be added later" in that situation.
+`parseCommand()` is the only function that would need replacing — it
+returns the same `{ intent, entities }` shape either way, so nothing
+else in the pipeline (recognition, routing, UI) would need to change.
+
+**Reuses existing actions, doesn't duplicate them:** LOGOUT calls the
+exact same `performSignOut()` function now shared with the nav bar's
+sign-out button (extracted to `lib/auth/signOut.ts` specifically for
+this); JOIN_CLASS/START_TEST navigate to the same routes the Join/Start
+links already point to; class and test candidates are fetched through
+the same RLS-protected Supabase queries as everywhere else in the app —
+a student's voice commands are bound by the identical row-level security
+as their clicks, there's no separate, less-restricted path.
+
+### What was verified, and what wasn't
+
+The intent parser and entity-resolution logic are pure functions with no
+browser dependency, so they were actually run — not just built — against
+15 real command variants (including all four natural-language phrasings
+of "join my maths class" from the spec's own section 2) plus the
+disambiguation and clarification-answer-matching logic, and every result
+was correct.
+
+What can't be verified here: actual microphone input and real speech
+recognition accuracy — this sandbox has no audio hardware, the same
+limitation as LiveKit video earlier. `SpeechRecognition`/
+`SpeechSynthesis` are standard, stable browser APIs (Web Speech API);
+the code is written against their documented, well-established shape,
+with `isVoiceSupported()` feature-detecting so the mic button simply
+doesn't render on browsers without support (Firefox, notably) rather
+than showing something broken.
+
+## Known limitations (Stage 14)
+
+- **In-test voice control isn't built yet** — reading a question aloud,
+  saying "option C," "next question," or "submit test" by voice (spec
+  section 14, the fullest part of the demo scenario) needs deeper
+  integration into `TakeTest.tsx` itself, not just navigation. Deferred
+  as a clearly separate next step rather than half-building it into this
+  pass.
+- Voice control is student-only for now — the spec is scoped to the
+  student experience throughout, so teacher/parent voice control wasn't
+  built.
+- No true continuous "voice mode" (spec section 21 mentions this as
+  optional/opt-in) — every command is a single tap-and-speak.
+- Browser support is real but partial: Chrome/Edge work, Safari is
+  patchy, Firefox doesn't support the Web Speech API at all — the mic
+  button hides itself gracefully there rather than erroring.
+- Recognition language is fixed to `en-IN` (Indian English) rather than
+  configurable per student.
+
 ## Known limitations (Stage 13)
 
 - See the structural signup-collects-only-one-contact-method gap
@@ -791,26 +873,32 @@ way, same as the WhatsApp adapter's unconfigured behavior.
 
 ## What's left
 
-Email fee reminders (Stage 13) join WhatsApp (Stage 12) and live
-classroom + whiteboard (Stage 11) as real, built, ready-to-go features
-waiting only on your credentials to actually send/connect for real. That
-leaves one item genuinely deprioritized by your own call rather than
-blocked:
+Voice-controlled navigation (Stage 14) is built and its core logic
+verified with real command tests. In-test voice control (reading
+questions aloud, answering by voice, voice-submit) is the natural next
+piece if you want the fullest version of the spec's demo scenario.
 
-- **Real payments** — the mock adapter is fully wired and tested; a
-  Razorpay adapter is a contained follow-up whenever you want it.
+Beyond that, same status as before:
+
+- **Real payments** — mock adapter fully wired and tested; a Razorpay
+  adapter is a contained follow-up whenever you want it (deprioritized
+  by your own call, not blocked).
+- **WhatsApp / email fee reminders** — both built and ready; WhatsApp
+  needs a Meta billing method attached before it'll send anything, email
+  via Resend is live and working.
 
 Everything else from the original master prompt that's buildable
 without a third-party account has been built: full auth for all three
 roles, class creation, automatic lesson planning with adaptive
 rescheduling, materials, attendance, assignments, doubts, fee cycles,
-mock payments, in-app notifications, WhatsApp + email fee reminders, a
-shared question bank powering tests and practice/games, XP, badges with
+mock payments, in-app + WhatsApp + email notifications, a shared
+question bank powering tests and practice/games, XP, badges with
 downloadable certificates, a read-only admin panel, calendar, search,
-CI/CD, live video + a collaborative whiteboard, and a real design system
-with a working sign-out. Every migration was executed against a real
-running Postgres database as part of building it — that discipline
-caught and fixed several real bugs along the way (an RLS policy cycle,
-two payment-forgery holes, a grade-tampering hole, and a couple of UI
-bugs caught while polishing the classroom) that all looked completely
-correct on inspection and only surfaced once actually run.
+CI/CD, live video + a collaborative whiteboard, a real design system
+with working sign-out, and voice-controlled navigation. Every migration
+was executed against a real running Postgres database as part of
+building it, and every piece of pure logic (RLS policies, payment
+guards, the voice intent parser) was actually run against real test
+cases rather than only read for correctness — that discipline caught
+and fixed several real bugs along the way that all looked completely
+correct on inspection and only surfaced once actually tested.

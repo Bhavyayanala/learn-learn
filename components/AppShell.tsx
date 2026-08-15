@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { NotificationBell } from "@/components/NotificationBell";
+import { performSignOut } from "@/lib/auth/signOut";
 
 type Role = "teacher" | "student" | "parent" | "admin";
 
@@ -39,11 +39,10 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const supabase = createClient();
   const style = ROLE_STYLE[role];
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
+    await performSignOut();
     router.push("/login");
     router.refresh();
   }

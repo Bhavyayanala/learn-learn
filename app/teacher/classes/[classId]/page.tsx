@@ -11,6 +11,8 @@ import { DoubtsPanel } from "@/components/DoubtsPanel";
 import { FeePanel, type FeeCycleRow } from "@/components/FeePanel";
 import { QuestionBank, type QuestionRow } from "@/components/QuestionBank";
 import { TestManager, type TestRow } from "@/components/TestManager";
+import { Tabs, type Tab } from "@/components/ui/Tabs";
+import { Panel } from "@/components/ui/Panel";
 
 export default async function ClassDetailPage({
   params,
@@ -166,6 +168,127 @@ export default async function ClassDetailPage({
     };
   });
 
+  const openDoubtCount = doubts.filter((d) => d.status !== "answered").length;
+  const pendingGradeCount = assignments.reduce(
+    (n, a) => n + a.submissions.filter((s) => s.marks_awarded === null).length,
+    0
+  );
+
+  const tabs: Tab[] = [
+    {
+      id: "overview",
+      label: "Overview",
+      icon: "🏫",
+      content: (
+        <div className="space-y-6">
+          <Panel
+            title="Lesson Plan"
+            description="LearnNest proposes a full month's plan from the syllabus — you review, edit, and accept it before it goes live."
+          >
+            {existingPlan ? (
+              <div className="flex items-center gap-3">
+                <Link
+                  href={`/teacher/classes/${klass.id}/plan`}
+                  className="rounded-xl bg-teacher px-4 py-2.5 font-medium text-white hover:opacity-90"
+                >
+                  {existingPlan.status === "accepted" ? "View Lesson Plan" : "Review Draft Plan"}
+                </Link>
+                <span className="text-sm text-ink/50">Status: {existingPlan.status}</span>
+              </div>
+            ) : (
+              <GeneratePlanButton classId={klass.id} />
+            )}
+          </Panel>
+
+          <Panel title="Teaching Materials" description="Upload the syllabus, textbook chapters, or notes for this class.">
+            <MaterialUploader classId={klass.id} teacherId={klass.teacher_id} initialMaterials={materials ?? []} />
+          </Panel>
+
+          <div className="flex justify-end">
+            <DeleteClassButton classId={klass.id} />
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "students",
+      label: "Students",
+      icon: "🧑‍🎓",
+      content: (
+        <div className="space-y-6">
+          <Panel title="Students" description="Enroll students by the email they signed up with.">
+            <StudentEnrollment classId={klass.id} initialStudents={enrolledStudents} />
+          </Panel>
+          <Panel
+            title="Attendance"
+            description="Pick a date and mark who attended. Everyone starts as present — just change the ones who weren't."
+          >
+            <AttendanceTaker classId={klass.id} hasStudents={enrolledStudents.length > 0} />
+          </Panel>
+        </div>
+      ),
+    },
+    {
+      id: "homework",
+      label: "Homework",
+      icon: "✏️",
+      content: (
+        <Panel title="Assignments & Homework" description="Set work for the class, then grade what students submit.">
+          <AssignmentManager classId={klass.id} initialAssignments={assignments} />
+        </Panel>
+      ),
+    },
+    {
+      id: "tests",
+      label: "Tests",
+      icon: "📝",
+      content: (
+        <div className="space-y-6">
+          <Panel
+            title="Question Bank"
+            description="Questions here power both formal tests and students' practice/game mode."
+          >
+            <QuestionBank classId={klass.id} initialQuestions={(questionRows ?? []) as QuestionRow[]} />
+          </Panel>
+          <Panel title="Tests" description="Build a test from your question bank; scores are graded automatically.">
+            <TestManager
+              classId={klass.id}
+              initialTests={tests}
+              availableQuestions={(questionRows ?? []) as QuestionRow[]}
+            />
+          </Panel>
+        </div>
+      ),
+    },
+    {
+      id: "doubts",
+      label: "Questions",
+      icon: "💬",
+      content: (
+        <Panel title="Student Questions" description="Questions students have asked you from their dashboard.">
+          <DoubtsPanel initialDoubts={doubts} />
+        </Panel>
+      ),
+    },
+    {
+      id: "fees",
+      label: "Fees",
+      icon: "💳",
+      content: (
+        <Panel
+          title="Tuition Fees"
+          description="Generate this month's fees. A cycle becomes due once the planned number of classes has been completed."
+        >
+          <FeePanel
+            classId={klass.id}
+            monthlyFee={klass.monthly_fee !== null ? Number(klass.monthly_fee) : null}
+            initialCycles={feeCycles}
+          />
+        </Panel>
+      ),
+    },
+  ];
+
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
       <Link href="/teacher/classes" className="text-sm text-teacher underline">
@@ -177,7 +300,7 @@ export default async function ClassDetailPage({
           <p className="text-sm font-medium text-teacher">
             {klass.grade} · {subjectName ?? "Subject"}
           </p>
-          <h1 className="mt-1 text-2xl font-semibold">Class Overview</h1>
+          <h1 className="mt-1 font-display text-2xl font-semibold">Class Overview</h1>
         </div>
         <Link
           href={`/classroom/${klass.id}`}
@@ -186,145 +309,30 @@ export default async function ClassDetailPage({
           🎥 Start Live Class
         </Link>
       </div>
-        <p className="mt-2 text-sm text-slate-500">
-          {klass.classes_per_month} classes/month · {klass.duration_minutes} min
-          each
-          {klass.monthly_fee ? ` · ₹${klass.monthly_fee}/month` : ""}
-          {klass.start_date ? ` · starts ${klass.start_date}` : ""}
-          {klass.days_of_week?.length
-            ? ` · ${klass.days_of_week.join(", ")}`
-            : ""}
-        </p>
+      <p className="mt-2 text-sm text-ink/50">
+        {klass.classes_per_month} classes/month · {klass.duration_minutes} min each
+        {klass.monthly_fee ? ` · ₹${klass.monthly_fee}/month` : ""}
+        {klass.start_date ? ` · starts ${klass.start_date}` : ""}
+        {klass.days_of_week?.length ? ` · ${klass.days_of_week.join(", ")}` : ""}
+      </p>
 
-      <section className="mt-8 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
-        <h2 className="font-semibold">Teaching Materials</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Upload the syllabus, textbook chapters, or notes for this class.
-        </p>
-        <div className="mt-4">
-          <MaterialUploader
-            classId={klass.id}
-            teacherId={klass.teacher_id}
-            initialMaterials={materials ?? []}
-          />
-        </div>
-      </section>
-
-      <section className="mt-6 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
-        <h2 className="font-semibold">Lesson Plan</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          LearnNest proposes a full month&apos;s plan from the syllabus —
-          you review, edit, and accept it before it goes live.
-        </p>
-        <div className="mt-4">
-          {existingPlan ? (
-            <div className="flex items-center gap-3">
-              <Link
-                href={`/teacher/classes/${klass.id}/plan`}
-                className="rounded-xl bg-teacher px-4 py-2.5 font-medium text-white hover:opacity-90"
-              >
-                {existingPlan.status === "accepted"
-                  ? "View Lesson Plan"
-                  : "Review Draft Plan"}
-              </Link>
-              <span className="text-sm text-slate-500">
-                Status: {existingPlan.status}
-              </span>
-            </div>
-          ) : (
-            <GeneratePlanButton classId={klass.id} />
+      {(openDoubtCount > 0 || pendingGradeCount > 0) && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {openDoubtCount > 0 && (
+            <span className="rounded-full bg-teacher-light px-3 py-1 text-xs font-semibold text-teacher">
+              💬 {openDoubtCount} question{openDoubtCount === 1 ? "" : "s"} waiting
+            </span>
+          )}
+          {pendingGradeCount > 0 && (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+              ✏️ {pendingGradeCount} to grade
+            </span>
           )}
         </div>
-      </section>
+      )}
 
-      <section className="mt-6 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
-        <h2 className="font-semibold">Students</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Enroll students by the email they signed up with.
-        </p>
-        <div className="mt-4">
-          <StudentEnrollment
-            classId={klass.id}
-            initialStudents={enrolledStudents}
-          />
-        </div>
-      </section>
-
-      <section className="mt-6 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
-        <h2 className="font-semibold">Attendance</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Pick a date and mark who attended. Everyone starts as present —
-          just change the ones who weren&apos;t.
-        </p>
-        <div className="mt-4">
-          <AttendanceTaker
-            classId={klass.id}
-            hasStudents={enrolledStudents.length > 0}
-          />
-        </div>
-      </section>
-
-      <section className="mt-6 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
-        <h2 className="font-semibold">Assignments &amp; Homework</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Set work for the class, then grade what students submit.
-        </p>
-        <div className="mt-4">
-          <AssignmentManager classId={klass.id} initialAssignments={assignments} />
-        </div>
-      </section>
-
-      <section className="mt-6 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
-        <h2 className="font-semibold">Student Questions</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Questions students have asked you from their dashboard.
-        </p>
-        <div className="mt-4">
-          <DoubtsPanel initialDoubts={doubts} />
-        </div>
-      </section>
-
-      <section className="mt-6 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
-        <h2 className="font-semibold">Tuition Fees</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Generate this month&apos;s fees. A cycle becomes due once the
-          planned number of classes has been completed.
-        </p>
-        <div className="mt-4">
-          <FeePanel
-            classId={klass.id}
-            monthlyFee={klass.monthly_fee !== null ? Number(klass.monthly_fee) : null}
-            initialCycles={feeCycles}
-          />
-        </div>
-      </section>
-
-      <section className="mt-6 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
-        <h2 className="font-semibold">Question Bank</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Questions here power both formal tests and students&apos; practice/game mode.
-        </p>
-        <div className="mt-4">
-          <QuestionBank classId={klass.id} initialQuestions={(questionRows ?? []) as QuestionRow[]} />
-        </div>
-      </section>
-
-      <section className="mt-6 rounded-2xl border border-teacher-light bg-white p-6 shadow-sm">
-        <h2 className="font-semibold">Tests</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Build a test from your question bank; scores are graded automatically.
-        </p>
-        <div className="mt-4">
-          <TestManager
-            classId={klass.id}
-            initialTests={tests}
-            availableQuestions={(questionRows ?? []) as QuestionRow[]}
-          />
-        </div>
-      </section>
-
-      <div className="mt-6 flex justify-end">
-        <DeleteClassButton classId={klass.id} />
+      <div className="mt-6">
+        <Tabs tabs={tabs} />
       </div>
     </main>
   );

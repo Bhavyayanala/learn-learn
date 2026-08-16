@@ -1,4 +1,4 @@
-# LearnNest — Stage 15: UI/UX Polish Pass 2 (Dashboards + Primitives)
+# LearnNest — Stage 16: UI/UX Polish Pass 3 (Tabs + Test UI)
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,

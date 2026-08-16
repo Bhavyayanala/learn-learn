@@ -1,4 +1,4 @@
-# LearnNest — Stage 14: Voice-Controlled Navigation
+# LearnNest — Stage 15: UI/UX Polish Pass 2 (Dashboards + Primitives)
 
 A kid-friendly tuition platform for teachers, students (Class 3–4), and
 parents. This is **Stage 1 of a multi-stage build** — it delivers a real,
@@ -687,6 +687,65 @@ the code is written against their documented, well-established shape,
 with `isVoiceSupported()` feature-detecting so the mic button simply
 doesn't render on browsers without support (Firefox, notably) rather
 than showing something broken.
+
+## What's included in Stage 15
+
+A second, more thorough design pass focused on the pages the UI spec
+calls out as highest priority: the student dashboard hierarchy, a real
+progress page, and reusable component primitives.
+
+- **`components/ui/`** — StatCard, EmptyState, ProgressBar, StatusPill.
+  Genuinely reused rather than one-off: StatCard now backs both the
+  teacher dashboard's stat row and the new student progress page;
+  EmptyState replaces four separate ad-hoc "nothing here" messages;
+  StatusPill replaces inline pill markup that was duplicated per page.
+- **Student dashboard restructured** into the requested hierarchy: top
+  (greeting + XP/streak), main (a single prominent "Continue Learning"
+  card, then class/practice quick actions, then test/homework counts at
+  a glance), bottom (subjects, achievements with a link to full
+  progress). Study materials are now resource cards with a file-type
+  icon (🎥 video, 🔊 audio, 📕 PDF, 📊 spreadsheet) instead of a plain
+  file-name list. Real empty states everywhere something could be empty
+  (no tests, no homework, no materials, no classes).
+- **New `/student/progress` page** — didn't exist before. Subject-wise
+  progress bars computed from real `lesson_plan_items` completion data,
+  plus totals (lessons/tests/homework completed, XP, current streak) —
+  all from data that already existed, just not surfaced anywhere as a
+  dedicated view.
+- **Teacher dashboard**: stat row now uses StatCard, added a "To grade"
+  count (ungraded submissions across all classes) that wasn't shown
+  before, and a proper empty state for a brand-new teacher with zero
+  classes instead of a blank section.
+
+### What this pass did NOT attempt, and why
+
+The source UI spec's section 11 asks for an "interactive lesson page"
+with embedded visual examples (a pizza cut into fraction slices, inline
+multiple-choice practice within the lesson itself). That assumes a
+**lesson content viewer** — a page that renders authored teaching
+content with embedded interactions — which doesn't exist in this app's
+data model. Lesson plan items are structured metadata (topic, objective,
+day, completion %), not authored content with embeddable visuals.
+Building that would mean designing a new content-authoring system
+(where does the pizza SVG come from? who authors the inline practice
+questions and how do they attach to a specific lesson?), not a UI polish
+pass over existing data. Flagged honestly rather than building a
+disconnected mock.
+
+Also not attempted in this pass: full page-by-page treatment of the
+class page tabs, a teacher-side "recent activity" feed, and onboarding
+flow — all real, buildable items, just not done in this round given the
+size of the full spec (37 sections). Happy to continue with any of
+these specifically.
+
+### Verification
+
+`npm run build` — clean, including the new `/student/progress` route.
+No business logic, database schema, authentication, API contracts, or
+RLS policies were touched — this pass is presentation-layer only, per
+the spec's own explicit instruction not to change working functionality.
+The one new query (teacher's "to grade" count) is a plain read against
+data and RLS policies already tested in earlier stages.
 
 ## Known limitations (Stage 14)
 

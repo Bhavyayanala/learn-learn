@@ -26,7 +26,6 @@ const DASHBOARD_SECTION_IDS: Record<string, string> = {
   OPEN_TESTS: "voice-tests-section",
   OPEN_HOMEWORK: "voice-homework-section",
   OPEN_STUDY_MATERIALS: "voice-materials-section",
-  OPEN_PROGRESS: "voice-progress-section",
 };
 
 type Pending =
@@ -204,9 +203,14 @@ export function VoiceControl() {
       case "OPEN_TESTS":
       case "OPEN_HOMEWORK":
       case "OPEN_STUDY_MATERIALS":
-      case "OPEN_PROGRESS":
-        say(`Opening ${command.intent === "OPEN_TESTS" ? "your tests" : command.intent === "OPEN_HOMEWORK" ? "your homework" : command.intent === "OPEN_STUDY_MATERIALS" ? "your study materials" : "your progress"}.`);
+        say(`Opening ${command.intent === "OPEN_TESTS" ? "your tests" : command.intent === "OPEN_HOMEWORK" ? "your homework" : "your study materials"}.`);
         await scrollToSection(command.intent);
+        setState("success");
+        break;
+
+      case "OPEN_PROGRESS":
+        say("Opening your progress.");
+        router.push("/student/progress");
         setState("success");
         break;
 

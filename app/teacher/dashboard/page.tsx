@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { StatCard } from "@/components/ui/StatCard";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type ClassSummary = {
   id: string;
@@ -101,6 +103,15 @@ export default async function TeacherDashboard() {
     (c) => c.pendingProposal || c.planStatus === "draft"
   );
 
+  const classIds = summaries.map((c) => c.id);
+  const { count: pendingGrading } = classIds.length
+    ? await supabase
+        .from("assignment_submissions")
+        .select("id, assignments!inner(class_id)", { count: "exact", head: true })
+        .is("marks_awarded", null)
+        .in("assignments.class_id", classIds)
+    : { count: 0 };
+
   return (
     <main className="mx-auto max-w-4xl px-4 py-10">
       <div className="rounded-2xl border border-teacher-light bg-white p-8 shadow-sm">
@@ -109,23 +120,27 @@ export default async function TeacherDashboard() {
           Welcome, {user.user_metadata?.full_name ?? "Teacher"} 👋
         </h1>
 
-        <div className="mt-6 grid grid-cols-3 gap-4">
-          <div className="rounded-xl bg-slate-50 p-4">
-            <p className="text-2xl font-semibold">{summaries.length}</p>
-            <p className="text-xs text-slate-500">
-              Class{summaries.length === 1 ? "" : "es"}
-            </p>
-          </div>
-          <div className="rounded-xl bg-slate-50 p-4">
-            <p className="text-2xl font-semibold">{totalStudents}</p>
-            <p className="text-xs text-slate-500">
-              Student{totalStudents === 1 ? "" : "s"}
-            </p>
-          </div>
-          <div className="rounded-xl bg-slate-50 p-4">
-            <p className="text-2xl font-semibold">{actionsNeeded.length}</p>
-            <p className="text-xs text-slate-500">Need attention</p>
-          </div>
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            value={summaries.length}
+            label={`Class${summaries.length === 1 ? "" : "es"}`}
+            icon="🏫"
+          />
+          <StatCard
+            value={totalStudents}
+            label={`Student${totalStudents === 1 ? "" : "s"}`}
+            icon="🧑‍🎓"
+          />
+          <StatCard
+            value={pendingGrading ?? 0}
+            label="To grade"
+            icon="✏️"
+          />
+          <StatCard
+            value={actionsNeeded.length}
+            label="Need attention"
+            icon="⚠️"
+          />
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
@@ -223,6 +238,16 @@ export default async function TeacherDashboard() {
             ))}
           </ul>
         </section>
+      )}
+
+      {summaries.length === 0 && (
+        <div className="mt-6">
+          <EmptyState
+            emoji="🏫"
+            title="No classes yet"
+            body="Create your first class to get started."
+          />
+        </div>
       )}
     </main>
   );
